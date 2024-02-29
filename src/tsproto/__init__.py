@@ -1,1 +1,1 @@
-from .tsproto import *
+from .tsproto import PrototypeEncoder
