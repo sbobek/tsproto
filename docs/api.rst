@@ -1,5 +1,3 @@
-.. currentmodule:: tsproto
-
 API Reference
 =============
 This page contains the API reference for public objects and functions in TSProto.
