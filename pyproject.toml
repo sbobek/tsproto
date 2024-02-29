@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tsproto"
-version = "1.0.1"
+version = "0.1.0"
 description = "Post-host prototype-based explanations with rules for time-series classifiers"
 readme = "README.md"
 authors = [{ name = "Szymon Bobek", email = "szymon.bobek@gmail.com" }]
@@ -29,6 +29,8 @@ dependencies = ["pandas>=1.4.3",
     ]
 requires-python = ">=3.8"
 
+[project.optional-dependencies]
+gpu = ["torch>=2.0.1"]
 
 [project.urls]
 Homepage = "https://github.com/sbobek/tsproto"

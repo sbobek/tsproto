@@ -1,6 +1,6 @@
+import warnings
+
 import pandas as pd
-import numpy as np
-from matplotlib import pyplot as plt
 from itertools import cycle
 from ruptures.utils import pairwise
 import ruptures as rpt
@@ -10,10 +10,9 @@ from sklearn.tree import DecisionTreeClassifier
 import time
 from tslearn.clustering import KShape
 from kshape.core import KShapeClusteringCPU
-from kshape.core_gpu import KShapeClusteringGPU
 from tslearn.preprocessing import TimeSeriesScalerMeanVariance
 from sklearn.cluster import KMeans
-
+import importlib.util
 
 from numpy import mean
 from graphviz import Digraph
@@ -147,6 +146,14 @@ class PrototypeEncoder():
         self.signal_ids_ = {}
         self.sampling_rate_ = sampling_rate
         self.weights_ = {}
+
+        torch_spec = importlib.util.find_spec("torch")
+        torch_found = torch_spec is not None
+        if not torch_found and self.method == 'kshapegpu':
+            self.method = 'kshape'
+            warnings.warn("To use GPU version of KSHAPE, install TSProto with GPU support: pip install tsproto[gpu]")
+        elif self.method == 'kshapegpu':
+            from kshape.core_gpu import KShapeClusteringGPU
 
         if feature_names is None:
             self.feature_names = [str(f) for f in range(0, dims)]
@@ -302,6 +309,7 @@ class PrototypeEncoder():
                     self.kms_[dim] = KShapeClusteringCPU(n_clusters=self.n_clusters[self.feature_names[dim]],
                                                          n_jobs=self.n_jobs)
                 elif self.method == 'gpukshape':
+
                     self.kms_[dim] = KShapeClusteringGPU(n_clusters=self.n_clusters[self.feature_names[dim]])
                 elif self.method == 'kmeans':
                     self.kms_[dim] = KMeans(n_clusters=self.n_clusters[self.feature_names[dim]])
