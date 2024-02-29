@@ -1,3 +1,5 @@
+.. currentmodule:: tsproto
+
 API Reference
 =============
 This page contains the API reference for public objects and functions in TSProto.
@@ -9,7 +11,7 @@ Explanation interface
 .. autosummary::
     :toctree: generated/
 
-    tsproto.tsproto.PrototypeEncoder
+    PrototypeEncoder
 
 
 
