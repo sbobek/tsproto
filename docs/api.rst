@@ -1,7 +1,6 @@
 API Reference
 =============
-This page contains the API reference for public objects and functions in LUX.
-
+This page contains the API reference for public objects and functions in TSProto.
 
 .. _explanation_api:
 
