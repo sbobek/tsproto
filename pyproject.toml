@@ -14,7 +14,7 @@ classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
 ]
-keywords = ["xai", "explainability", "model-agnostic", "rule-based"]
+keywords = ["xai", "time-series","explainability", "model-agnostic", "rule-based"]
 dependencies = ["pandas>=1.4.3",
     "numpy>=1.22.4",
     "scikit-learn>=1.1.1",

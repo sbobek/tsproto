@@ -11,7 +11,7 @@ Explanation interface
 .. autosummary::
     :toctree: generated/
 
-    PrototypeEncoder
+    tsproto.PrototypeEncoder
 
 
 
