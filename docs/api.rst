@@ -1,4 +1,3 @@
-.. currentmodule:: tsproto
 
 API Reference
 =============
