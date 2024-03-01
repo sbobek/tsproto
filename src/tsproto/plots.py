@@ -14,13 +14,10 @@ from tsproto.utils import dominant_frequencies_for_rows
 import pandas as pd
 import numpy as np
 import ruptures as rpt
-from tslearn.clustering import TimeSeriesKMeans
-from tslearn.utils import to_time_series_dataset
 from sklearn.tree import DecisionTreeClassifier
 import time
 from tslearn.clustering import KShape
 from kshape.core import KShapeClusteringCPU
-from tslearn.preprocessing import TimeSeriesScalerMeanVariance
 from sklearn.cluster import KMeans
 from importlib.util import find_spec
 from numpy import mean
