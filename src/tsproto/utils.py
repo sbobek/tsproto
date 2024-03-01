@@ -1,6 +1,12 @@
 import numpy as np
 
 def outliers(data, multiplier=1.5):
+    """
+
+    :param data:
+    :param multiplier:
+    :return:
+    """
     # finding the 1st quartile
     q1 = np.quantile(data, 0.25)
 

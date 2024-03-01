@@ -3,7 +3,7 @@ API Reference
 =============
 This page contains the API reference for public objects and functions in TSProto.
 
-.. _explanation_api:
+.. _models_api:
 
 Explanation interface
 -------------
