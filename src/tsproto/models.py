@@ -9,7 +9,7 @@ from tslearn.clustering import KShape
 from kshape.core import KShapeClusteringCPU
 from tslearn.preprocessing import TimeSeriesScalerMeanVariance
 from sklearn.cluster import KMeans
-import importlib.util
+from importlib.util import find_spec
 from numpy import mean
 from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score
 from sklearn.base import BaseEstimator, TransformerMixin
@@ -65,7 +65,7 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
         self.sampling_rate_ = sampling_rate
         self.weights_ = {}
 
-        torch_spec = importlib.util.find_spec("torch")
+        torch_spec = find_spec("torch")
         torch_found = torch_spec is not None
         if not torch_found and self.method == 'kshapegpu':
             self.method = 'kshape'
