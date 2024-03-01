@@ -6,7 +6,6 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from itertools import cycle
 from ruptures.utils import pairwise
-
 from tsproto.utils import dominant_frequencies_for_rows
 
 

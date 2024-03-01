@@ -1,3 +1,5 @@
+__all__ = ['PrototypeEncoder', 'InterpretableModel']
+
 import pandas as pd
 import numpy as np
 import ruptures as rpt
@@ -9,13 +11,13 @@ from tslearn.clustering import KShape
 from kshape.core import KShapeClusteringCPU
 from tslearn.preprocessing import TimeSeriesScalerMeanVariance
 from sklearn.cluster import KMeans
-from importlib.util import find_spec
+#from importlib.util import find_spec
 from numpy import mean
 from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score
 from sklearn.base import BaseEstimator, TransformerMixin
 
 from tsproto.utils import dominant_frequencies_for_rows
-import warnings
+#import warnings
 
 
 class PrototypeEncoder(BaseEstimator, TransformerMixin):
@@ -65,13 +67,13 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
         self.sampling_rate_ = sampling_rate
         self.weights_ = {}
 
-        torch_spec = find_spec("torch")
-        torch_found = torch_spec is not None
-        if not torch_found and self.method == 'kshapegpu':
-            self.method = 'kshape'
-            warnings.warn("To use GPU version of KSHAPE, install TSProto with GPU support: pip install tsproto[gpu]")
-        elif self.method == 'kshapegpu':
-            from kshape.core_gpu import KShapeClusteringGPU
+        # torch_spec = find_spec("torch")
+        # torch_found = torch_spec is not None
+        # if not torch_found and self.method == 'kshapegpu':
+        #     self.method = 'kshape'
+        #     warnings.warn("To use GPU version of KSHAPE, install TSProto with GPU support: pip install tsproto[gpu]")
+        # elif self.method == 'kshapegpu':
+        #     from kshape.core_gpu import KShapeClusteringGPU
 
         if feature_names is None:
             self.feature_names = [str(f) for f in range(0, dims)]
@@ -359,7 +361,7 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
 
 class InterpretableModel:
     def fit_or_predict(ohe_train, features, target, intclf=None, verbose=0, max_depth=None, min_samples_leaf=0.05,
-                            weights=None):
+                       weights=None):
         if intclf is None:
             intclf = DecisionTreeClassifier(max_depth=max_depth, min_samples_leaf=min_samples_leaf)
             intclf.fit(ohe_train[features], ohe_train[target], sample_weight=weights)
