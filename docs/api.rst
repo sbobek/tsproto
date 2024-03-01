@@ -10,6 +10,7 @@ Explanation interface
 .. autosummary::
     :toctree: generated/
 
+    tsproto.tsproto.PrototypeEncoder
 
 
 .. _plots_api:

@@ -27,6 +27,22 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
     def __init__(self, blackbox, min_size, jump, pen, n_clusters, multiplier=1.5, method='kshape',
                  descriptors=['existance', 'duration', 'stats'], n_jobs=None, verbose=0, dims=1, sampling_rate=1,
                  feature_names=None):
+        """
+
+        :param blackbox:
+        :param min_size:
+        :param jump:
+        :param pen:
+        :param n_clusters:
+        :param multiplier:
+        :param method:
+        :param descriptors:
+        :param n_jobs:
+        :param verbose:
+        :param dims:
+        :param sampling_rate:
+        :param feature_names:
+        """
         self.threshold = 0  # threshold for discarding slices of time-series of low importance
         self.multiplier = multiplier
         self.fixed_n_clusters = False
@@ -69,6 +85,13 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
                 self.n_clusters[self.feature_names[dim]] = n_clusters
 
     def fit(self, X, y=None, shapclass=None):
+        """
+
+        :param X:
+        :param y:
+        :param shapclass:
+        :return:
+        """
         if y is not None and shapclass is None:
             shapclass = y
         return self._transform(X, shapclass, refit=True, transform=False)
