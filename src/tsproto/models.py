@@ -1,5 +1,3 @@
-import warnings
-
 import pandas as pd
 import numpy as np
 import ruptures as rpt
@@ -17,6 +15,7 @@ from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_sc
 from sklearn.base import BaseEstimator, TransformerMixin
 
 from tsproto.utils import dominant_frequencies_for_rows
+import warnings
 
 
 class PrototypeEncoder(BaseEstimator, TransformerMixin):
@@ -96,7 +95,7 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
             shapclass = y
         return self._transform(X, shapclass, refit=True, transform=False)
 
-    def transform(self, X, y=None,shapclass=None):
+    def transform(self, X, y=None, shapclass=None):
         if y is not None and shapclass is None:
             shapclass = y
         return self._transform(X, shapclass, refit=False, transform=True)
@@ -358,27 +357,21 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
         return train, features, target, weights
 
 
-
-
-
-
-def interpretable_model(ohe_train, features, target, intclf=None, verbose=0, max_depth=None, min_samples_leaf=0.05,
-                        weights=None):
-    if intclf is None:
-        intclf = DecisionTreeClassifier(max_depth=max_depth, min_samples_leaf=min_samples_leaf)
-        intclf.fit(ohe_train[features], ohe_train[target], sample_weight=weights)
-    iclf_pred = intclf.predict(ohe_train[features])
-    if verbose > 0:
-        print(f'Tree depth: {intclf.get_depth()}')
-    if ohe_train[target].nunique() > 2:
-        average = 'macro'
-    else:
-        average = 'binary'
-    return (accuracy_score(ohe_train[target], iclf_pred),
-            precision_score(ohe_train[target], iclf_pred, average=average),
-            recall_score(ohe_train[target], iclf_pred, average=average),
-            f1_score(ohe_train[target], iclf_pred, average=average),
-            intclf)
-
-
-
+class InterpretableModel:
+    def fit_or_predict(ohe_train, features, target, intclf=None, verbose=0, max_depth=None, min_samples_leaf=0.05,
+                            weights=None):
+        if intclf is None:
+            intclf = DecisionTreeClassifier(max_depth=max_depth, min_samples_leaf=min_samples_leaf)
+            intclf.fit(ohe_train[features], ohe_train[target], sample_weight=weights)
+        iclf_pred = intclf.predict(ohe_train[features])
+        if verbose > 0:
+            print(f'Tree depth: {intclf.get_depth()}')
+        if ohe_train[target].nunique() > 2:
+            average = 'macro'
+        else:
+            average = 'binary'
+        return (accuracy_score(ohe_train[target], iclf_pred),
+                precision_score(ohe_train[target], iclf_pred, average=average),
+                recall_score(ohe_train[target], iclf_pred, average=average),
+                f1_score(ohe_train[target], iclf_pred, average=average),
+                intclf)

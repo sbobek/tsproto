@@ -11,7 +11,7 @@ Explanation interface
     :toctree: generated/
 
     tsproto.models.PrototypeEncoder
-
+    tsproto.models.InterpretableModel
 
 .. _plots_api:
 
