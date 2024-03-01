@@ -21,6 +21,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score
+from sklearn.base import BaseEstimator, TransformerMixin
 
 COLOR_CYCLE = ["#4286f4", "#f44174"]
 
@@ -119,7 +120,7 @@ def outliers(data, multiplier=1.5):
     return (iqr, upper_bound, lower_bound)
 
 
-class PrototypeEncoder():
+class PrototypeEncoder(BaseEstimator, TransformerMixin):
 
     def __init__(self, blackbox, min_size, jump, pen, n_clusters, multiplier=1.5, method='kshape',
                  descriptors=['existance', 'duration', 'stats'], n_jobs=None, verbose=0, dims=1, sampling_rate=1,
@@ -165,13 +166,19 @@ class PrototypeEncoder():
             for dim in range(dims):
                 self.n_clusters[self.feature_names[dim]] = n_clusters
 
-    def fit(self, X, shapclass):
+    def fit(self, X, y=None, shapclass=None):
+        if y is not None and shapclass is None:
+            shapclass = y
         return self._transform(X, shapclass, refit=True, transform=False)
 
-    def transform(self, X, shapclass):
+    def transform(self, X, y=None,shapclass=None):
+        if y is not None and shapclass is None:
+            shapclass = y
         return self._transform(X, shapclass, refit=False, transform=True)
 
-    def fit_transform(self, X, shapclass):
+    def fit_transform(self, X, y=None, shapclass=None):
+        if y is not None and shapclass is None:
+            shapclass = y
         return self._transform(X, shapclass, refit=True, transform=True)
 
     def _transform(self, Xdim, shap_dim, refit=False, transform=True):
@@ -309,7 +316,7 @@ class PrototypeEncoder():
                     self.kms_[dim] = KShapeClusteringCPU(n_clusters=self.n_clusters[self.feature_names[dim]],
                                                          n_jobs=self.n_jobs)
                 elif self.method == 'gpukshape':
-
+                    from kshape.core_gpu import KShapeClusteringGPU
                     self.kms_[dim] = KShapeClusteringGPU(n_clusters=self.n_clusters[self.feature_names[dim]])
                 elif self.method == 'kmeans':
                     self.kms_[dim] = KMeans(n_clusters=self.n_clusters[self.feature_names[dim]])

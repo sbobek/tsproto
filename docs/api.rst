@@ -10,7 +10,7 @@ Explanation interface
 .. autosummary::
     :toctree: generated/
 
-    tsproto.tsproto.PrototypeEncoder
+    tsproto.PrototypeEncoder
 
 
 
