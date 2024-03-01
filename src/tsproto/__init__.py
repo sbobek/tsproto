@@ -1,1 +1,1 @@
-from .tsproto import PrototypeEncoder
+__version__ = "0.1.0"
