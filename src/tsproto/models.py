@@ -11,7 +11,6 @@ from tslearn.clustering import KShape
 from kshape.core import KShapeClusteringCPU
 from tslearn.preprocessing import TimeSeriesScalerMeanVariance
 from sklearn.cluster import KMeans
-from importlib.util import find_spec
 from numpy import mean
 from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score
 from sklearn.base import BaseEstimator, TransformerMixin
@@ -70,11 +69,12 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
         self.sampling_rate_ = sampling_rate
         self.weights_ = {}
 
-        torch_spec = find_spec("torch")
-        torch_found = torch_spec is not None
-        if not torch_found and self.method == 'kshapegpu':
-            self.method = 'kshape'
-            warnings.warn("To use GPU version of KSHAPE, install TSProto with GPU support: pip install tsproto[gpu]")
+        if self.method == 'kshapegpu':
+            try:
+                from kshape.core_gpu import KShapeClusteringGPU
+            except ImportError:
+                self.method = 'kshape'
+                warnings.warn("To use GPU version of KSHAPE, install TSProto with GPU support: pip install tsproto[gpu]")
         elif self.method == 'kshapegpu':
             from kshape.core_gpu import KShapeClusteringGPU
 

@@ -9,20 +9,6 @@ from ruptures.utils import pairwise
 from tsproto.utils import dominant_frequencies_for_rows
 
 
-
-
-import pandas as pd
-import numpy as np
-import ruptures as rpt
-from sklearn.tree import DecisionTreeClassifier
-import time
-from kshape.core import KShapeClusteringCPU
-from sklearn.cluster import KMeans
-from numpy import mean
-from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score
-from sklearn.base import BaseEstimator, TransformerMixin
-import warnings
-
 def plot_and_save_barplot(target, filename, figsize=(4, 2)):
     """
     Plots a bar plot of the number of instances per class and saves it to a file.
