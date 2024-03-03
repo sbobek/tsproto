@@ -29,25 +29,3 @@ def foo():
     """
     pass
 
-
-
-
-
-class InterpretableModel:
-    def fit_or_predict(ohe_train, features, target, intclf=None, verbose=0, max_depth=None, min_samples_leaf=0.05,
-                       weights=None):
-        if intclf is None:
-            intclf = DecisionTreeClassifier(max_depth=max_depth, min_samples_leaf=min_samples_leaf)
-            intclf.fit(ohe_train[features], ohe_train[target], sample_weight=weights)
-        iclf_pred = intclf.predict(ohe_train[features])
-        if verbose > 0:
-            print(f'Tree depth: {intclf.get_depth()}')
-        if ohe_train[target].nunique() > 2:
-            average = 'macro'
-        else:
-            average = 'binary'
-        return (accuracy_score(ohe_train[target], iclf_pred),
-                precision_score(ohe_train[target], iclf_pred, average=average),
-                recall_score(ohe_train[target], iclf_pred, average=average),
-                f1_score(ohe_train[target], iclf_pred, average=average),
-                intclf)
