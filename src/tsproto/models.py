@@ -1,5 +1,4 @@
-__all__ = ['PrototypeEncoder', 'InterpretableModel']
-
+import warnings
 import pandas as pd
 import numpy as np
 import ruptures as rpt
@@ -16,12 +15,20 @@ from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_sc
 from sklearn.base import BaseEstimator, TransformerMixin
 
 from tsproto.utils import dominant_frequencies_for_rows
-import warnings
 
 """
 Documentation of this module
 
 """
+
+
+def foo():
+    """
+    Just a sample function to see if the docs fail on this file or on classes
+    :return:
+    """
+    pass
+
 class PrototypeEncoder(BaseEstimator, TransformerMixin):
     """
     Encodes time-series into prototypes
