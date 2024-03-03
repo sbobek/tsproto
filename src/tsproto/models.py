@@ -56,6 +56,7 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
         self.n_jobs = n_jobs
         self.verbose = verbose
         self.pen = pen
+        self.dims = dims
         self.blackbox = blackbox
         self.descriptors = descriptors
         self.thresholds_ = [None] * dims
@@ -66,7 +67,7 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
         self.xbis_shap_ = {}
         self.xbis_cluster_labels_ = {}
         self.signal_ids_ = {}
-        self.sampling_rate_ = sampling_rate
+        self.sampling_rate = sampling_rate
         self.weights_ = {}
 
         if self.method == 'kshapegpu':
@@ -284,7 +285,7 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
             Xdf['max'] = np.nanmax(X_bis, axis=1)
             Xdf['mean'] = np.nanmean(X_bis, axis=1)
             Xdf['std'] = np.nanstd(X_bis, axis=1)
-            Xdf['frequency'] = dominant_frequencies_for_rows(X_bis, sampling_rate=self.sampling_rate_)
+            Xdf['frequency'] = dominant_frequencies_for_rows(X_bis, sampling_rate=self.sampling_rate)
 
             phantom = pd.DataFrame({'sigid': [-1] * len(self.label_features_[dim]),
                                     'cluster': np.arange(0, len(self.label_features_[dim])),

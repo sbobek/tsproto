@@ -8,21 +8,6 @@ from itertools import cycle
 from ruptures.utils import pairwise
 from tsproto.utils import dominant_frequencies_for_rows
 
-
-import ruptures as rpt
-from tslearn.clustering import TimeSeriesKMeans
-from tslearn.utils import to_time_series_dataset
-from sklearn.tree import DecisionTreeClassifier
-import time
-from tslearn.clustering import KShape
-from kshape.core import KShapeClusteringCPU
-from tslearn.preprocessing import TimeSeriesScalerMeanVariance
-from sklearn.cluster import KMeans
-from numpy import mean
-from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score
-from sklearn.base import BaseEstimator, TransformerMixin
-import warnings
-
 def plot_and_save_barplot(target, filename, figsize=(4, 2)):
     """
     Plots a bar plot of the number of instances per class and saves it to a file.
@@ -282,7 +267,7 @@ def plot_histogram(ax, dataset, xbis, xbis_shap, xbisclusters, xbisindices, feat
                                    # target has to be populated over sigid
                                    cluster_index=int(cluster_index), stat_function=stat_function, ax=ax,
                                    human_friendly_name=human_friendly_name,
-                                   sampling_rate=proto_encoder.sampling_rate_, threshold=threshold)
+                                   sampling_rate=proto_encoder.sampling_rate, threshold=threshold)
 
     # ax.legend()
 
