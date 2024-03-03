@@ -16,7 +16,6 @@ import numpy as np
 import ruptures as rpt
 from sklearn.tree import DecisionTreeClassifier
 import time
-from tslearn.clustering import KShape
 from kshape.core import KShapeClusteringCPU
 from sklearn.cluster import KMeans
 from importlib.util import find_spec
