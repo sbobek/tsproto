@@ -19,7 +19,7 @@ from tsproto.utils import dominant_frequencies_for_rows
 import warnings
 
 """
-Documentaiton of this module
+Documentation of this module
 
 """
 class PrototypeEncoder(BaseEstimator, TransformerMixin):
