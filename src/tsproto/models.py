@@ -4,7 +4,7 @@ import ruptures as rpt
 #from tslearn.utils import to_time_series_dataset
 from sklearn.tree import DecisionTreeClassifier
 import time
-from tslearn.clustering import KShape
+#from tslearn.clustering import KShape
 from kshape.core import KShapeClusteringCPU
 #from tslearn.preprocessing import TimeSeriesScalerMeanVariance
 from sklearn.cluster import KMeans
