@@ -18,12 +18,9 @@ from sklearn.tree import DecisionTreeClassifier
 import time
 from kshape.core import KShapeClusteringCPU
 from sklearn.cluster import KMeans
-from importlib.util import find_spec
 from numpy import mean
 from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score
 from sklearn.base import BaseEstimator, TransformerMixin
-
-from tsproto.utils import dominant_frequencies_for_rows
 import warnings
 
 def plot_and_save_barplot(target, filename, figsize=(4, 2)):
