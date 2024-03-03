@@ -12,7 +12,6 @@ Explanation interface
     :toctree: generated/
 
     models.PrototypeEncoder
-    models.InterpretableModel
 
 .. _plots_api:
 
