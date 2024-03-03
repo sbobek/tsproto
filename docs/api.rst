@@ -1,3 +1,4 @@
+.. currentmodule:: tsproto
 
 API Reference
 =============
@@ -10,8 +11,8 @@ Explanation interface
 .. autosummary::
     :toctree: generated/
 
-    tsproto.models.PrototypeEncoder
-    tsproto.models.InterpretableModel
+    models.PrototypeEncoder
+    models.InterpretableModel
 
 .. _plots_api:
 
@@ -20,7 +21,7 @@ Plots
 .. autosummary::
     :toctree: generated/
 
-    tsproto.plots
+    plots
 
 
 .. _utils:
@@ -30,7 +31,7 @@ Utilities
 .. autosummary::
     :toctree: generated/
 
-    tsproto.utils
+    utils
 
 
 
