@@ -75,8 +75,6 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
             except ImportError:
                 self.method = 'kshape'
                 warnings.warn("To use GPU version of KSHAPE, install TSProto with GPU support: pip install tsproto[gpu]")
-        elif self.method == 'kshapegpu':
-            from kshape.core_gpu import KShapeClusteringGPU
 
         if feature_names is None:
             self.feature_names = [str(f) for f in range(0, dims)]
