@@ -11,7 +11,7 @@ Explanation interface
 .. autosummary::
     :toctree: generated/
 
-    models.PrototypeEncoder
+    models
 
 .. _plots_api:
 
