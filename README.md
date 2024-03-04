@@ -6,7 +6,7 @@ Key features:
   * Integrated with SHAP explainer, as a backbone for extraction of interpretable components (However, SHAP can be replaces with any other feature-importance method)
 
 ## Install
-LUX can be installed from either [PyPI]() or directly from source code from this repository.
+LUX can be installed from either [PyPI](https://pypi.org/project/tsproto/) or directly from source code from this repository.
 
 To install form PyPI:
 
