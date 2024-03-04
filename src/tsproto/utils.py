@@ -76,26 +76,20 @@ def dominant_frequencies_for_rows(time_series_array, sampling_rate):
 
 
 
-def getshap(model, X, y, shap_version='deep', bg_size=1000, stride=10, window_len=10, absshap=True):
-    if shap_version == 'window':
-        # There is a problem with Windowed version for more than two classes
-        indexes = np.arange(0, len(X))
+def getshap(model, X, y, shap_version='deep', bg_size=1000, stride=10, window_len=10, absshap=True, shuffle=True):
+    indexes = np.arange(0, len(X))
+    if shuffle:
         np.random.shuffle(indexes)
-        maxid = min(bg_size, len(X))
-        background_data = X[indexes[:maxid]]
+    maxid = min(bg_size, len(X))
 
+    background_data = X[indexes[:maxid]]
+    if shap_version == 'window':
         sv_tr = np.zeros((len(X), X.shape[1], X.shape[2]))
 
         for i in range(len(X)):
             gtw = SlidingWindowSHAP(model, stride, window_len, background_data, X[i:i + 1], model_type='lstm')
             sv_tr[i, :, :] = gtw.shap_values(num_output=y.shape[1])
     elif shap_version == 'deep':
-        indexes = np.arange(0, len(X))
-        np.random.shuffle(indexes)
-        maxid = min(bg_size, len(X))
-
-        background_data = X[indexes[:maxid]]
-
         explainer = shap.DeepExplainer(model, background_data)
         shap_values_tr = explainer.shap_values(X, check_additivity=False)
         if absshap:
@@ -109,4 +103,4 @@ def getshap(model, X, y, shap_version='deep', bg_size=1000, stride=10, window_le
             for i in range(0, len(X)):
                 sv_tr.append([shap_values_tr[indexer[i]][i, :]])
             sv_tr = np.concatenate(sv_tr)
-        return sv_tr
+        return background_data,sv_tr
