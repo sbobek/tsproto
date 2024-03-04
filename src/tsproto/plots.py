@@ -8,6 +8,9 @@ from itertools import cycle
 from ruptures.utils import pairwise
 from tsproto.utils import dominant_frequencies_for_rows
 
+COLOR_CYCLE = ["#4286f4", "#f44174"]
+
+
 def plot_and_save_barplot(target, filename, figsize=(4, 2)):
     """
     Plots a bar plot of the number of instances per class and saves it to a file.
@@ -439,10 +442,10 @@ def export_decision_tree_with_embedded_histograms(decision_tree, dataset, target
 # feature_names is the list of feature names, and you want to save the DOT file as 'decision_tree'
 # export_decision_tree_with_embedded_histograms(dt_classifier, feature_names, 'decision_tree')
 
-COLOR_CYCLE = ["#4286f4", "#f44174"]
 
 
-def display(
+
+def display_breakpoints(
         signal,
         true_chg_pts,
         computed_chg_pts=None,
@@ -517,4 +520,40 @@ def display(
                     alpha=computed_chg_pts_alpha,
                 )
 
+    return ax
+
+
+from matplotlib.collections import LineCollection
+from matplotlib.colors import Normalize
+
+def plot_smooth_colored_line(x_values, y_values, color_values, resolution=1000, ax=None, add_cbar=True):
+    # Interpolate y-values and color values for the higher-resolution x-values
+    x_values_high_res = np.linspace(x_values.min(), x_values.max(), resolution)
+    y_values_interp = np.interp(x_values_high_res, x_values, y_values)
+    color_values_interp = np.interp(x_values_high_res, x_values, color_values)
+
+    # Normalize color values to be in the range [0, 1] for colormap mapping
+    norm_color = Normalize(color_values_interp.min(), color_values_interp.max())
+    colors = plt.cm.viridis(norm_color(color_values_interp))
+
+    # Create a LineCollection with smooth gradient colors
+    points = np.column_stack([x_values_high_res, y_values_interp])
+    segments = np.column_stack([points[:-1], points[1:]])
+
+    # Reshape segments to have a shape of (M, 2, 2)
+    segments = segments.reshape(-1, 2, 2)
+
+    lc = LineCollection(segments, cmap='viridis', norm=norm_color)
+    lc.set_array(color_values_interp)
+
+    # Plot the line collection
+    if ax is None:
+        fig, ax = plt.subplots()
+    ax.add_collection(lc)
+    ax.autoscale()
+    #ax.set_xlim(0, len(x_values) - 1)
+
+    # Add colorbar
+    if add_cbar:
+        cbar = plt.colorbar(lc, ax=ax, label='SHAP Values')
     return ax

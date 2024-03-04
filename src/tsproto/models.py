@@ -362,7 +362,7 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
 
 
 class InterpretableModel:
-    def fit_or_predict(ohe_train, features, target, intclf=None, verbose=0, max_depth=None, min_samples_leaf=0.05,
+    def fit_or_predict(self,ohe_train, features, target, intclf=None, verbose=0, max_depth=None, min_samples_leaf=0.05,
                        weights=None):
         if intclf is None:
             intclf = DecisionTreeClassifier(max_depth=max_depth, min_samples_leaf=min_samples_leaf)

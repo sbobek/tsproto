@@ -1,5 +1,11 @@
 import numpy as np
+import shap
 
+from tsproto.windowshap import SlidingWindowSHAP
+
+"""
+Source code taken from: https://github.com/vsubbian/WindowSHAP
+"""
 def outliers(data, multiplier=1.5):
     """
 
@@ -67,3 +73,40 @@ def dominant_frequencies_for_rows(time_series_array, sampling_rate):
                                                sampling_rate=sampling_rate)
 
     return dominant_frequencies
+
+
+
+def getshap(model, X, y, shap_version='deep', bg_size=1000, stride=10, window_len=10, absshap=True):
+    if shap_version == 'window':
+        # There is a problem with Windowed version for more than two classes
+        indexes = np.arange(0, len(X))
+        np.random.shuffle(indexes)
+        maxid = min(bg_size, len(X))
+        background_data = X[indexes[:maxid]]
+
+        sv_tr = np.zeros((len(X), X.shape[1], X.shape[2]))
+
+        for i in range(len(X)):
+            gtw = SlidingWindowSHAP(model, stride, window_len, background_data, X[i:i + 1], model_type='lstm')
+            sv_tr[i, :, :] = gtw.shap_values(num_output=y.shape[1])
+    elif shap_version == 'deep':
+        indexes = np.arange(0, len(X))
+        np.random.shuffle(indexes)
+        maxid = min(bg_size, len(X))
+
+        background_data = X[indexes[:maxid]]
+
+        explainer = shap.DeepExplainer(model, background_data)
+        shap_values_tr = explainer.shap_values(X, check_additivity=False)
+        if absshap:
+            sv_tr = abs(np.array(shap_values_tr)).mean(
+                axis=0)  # This basically returns the average importance over the feature/sample
+            # Not taking into account the sign of shap value, as it is not required
+            # for breakpoints calculation
+        else:
+            indexer = np.argmax(model.predict(X), axis=1)
+            sv_tr = []
+            for i in range(0, len(X)):
+                sv_tr.append([shap_values_tr[indexer[i]][i, :]])
+            sv_tr = np.concatenate(sv_tr)
+        return sv_tr
