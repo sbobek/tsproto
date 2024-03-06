@@ -28,8 +28,8 @@ pip install .
 
 ## Usage
 For full examples on two illustrative cases go to:
-  * Example of extracting sine wave prototype and explaining class with existence ora absence of a prototype: [Jupyter Notebook]()
-  * Example of extracting sine wave as a prototype end explaining class by difference in frequency of a prototype [Jupyter Notebook]()
+  * Example of extracting sine wave prototype and explaining class with existence ora absence of a prototype: [Jupyter Notebook](https://github.com/sbobek/tsproto/blob/main/examples/illustrative-example-frequency.ipynb)
+  * Example of extracting sine wave as a prototype end explaining class by difference in frequency of a prototype [Jupyter Notebook](https://github.com/sbobek/tsproto/blob/main/examples/illustrative-example.ipynb)
 
 The basic usage of the TSProto assuming you have your model trained is straightforward:
 
