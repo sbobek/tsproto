@@ -1,3 +1,6 @@
+![PyPI - Downloads](https://img.shields.io/pypi/dm/tsproto) [![Documentation Status](https://readthedocs.org/projects/tsproto/badge/?version=latest)](https://tsproto.readthedocs.io/en/latest/?badge=latest)
+    
+
 # TSProto
 Post-host prototype-based explanations with rules for time-series classifiers.
 
