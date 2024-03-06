@@ -1,4 +1,5 @@
-![PyPI - Downloads](https://img.shields.io/pypi/dm/tsproto) [![Documentation Status](https://readthedocs.org/projects/tsproto/badge/?version=latest)](https://tsproto.readthedocs.io/en/latest/?badge=latest)
+[![PyPI](https://img.shields.io/pypi/v/tsproto)](https://pypi.org/project/tsproto/)  ![License](https://img.shields.io/github/license/sbobek/tsproto)
+ ![PyPI - Downloads](https://img.shields.io/pypi/dm/tsproto) [![Documentation Status](https://readthedocs.org/projects/tsproto/badge/?version=latest)](https://tsproto.readthedocs.io/en/latest/?badge=latest)
     
 
 # TSProto
