@@ -8,7 +8,6 @@ from tslearn.clustering import KShape
 from kshape.core import KShapeClusteringCPU
 from tslearn.preprocessing import TimeSeriesScalerMeanVariance
 from sklearn.cluster import KMeans
-from numpy import mean
 from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score
 from sklearn.base import BaseEstimator, TransformerMixin
 import numpy as np
@@ -26,28 +25,28 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
     Encodes time-series into prototypes
     """
 
-    def __init__(self, blackbox, min_size, jump, pen, n_clusters, multiplier=1.5, method='kshape',
-                 descriptors=['existance', 'duration', 'stats'], n_jobs=None, verbose=0, dims=1, sampling_rate=1,
-                 feature_names=None):
-        """
+    def __init__(self, blackbox, min_size, jump, pen, n_clusters, multiplier=1.5, method='dtw',
+                 descriptors=['existance', 'duration', 'stats','startpoint'], n_jobs=None, verbose=0,
+                 dims=1, sampling_rate=1,feature_names=None,importance_aggregation_func=np.mean):
+        """ Initializes PrototypeEncoder class
 
-        :param blackbox:
-        :param min_size:
-        :param jump:
-        :param pen:
-        :param n_clusters:
-        :param multiplier:
-        :param method:
-        :param descriptors:
-        :param n_jobs:
-        :param verbose:
-        :param dims:
-        :param sampling_rate:
-        :param feature_names:
+        :param blackbox: instance of a blackbox model that is to be explained
+        :param min_size: minimum size of a prototype (Pelt algorithm parameter)
+        :param jump: subsample (one every jump points) (Pelt algorithm parameter)
+        :param pen: penalty value (>0) (Pelt algorithm parameter)
+        :param n_clusters: number of clusters to generated (these are going to be prototypes). It can be int, float or dict.
+        :param multiplier: multiplier used in outlier deteciton. The smaller the value the stronger reduction of outliers
+        :param method: clustering algorithms method. Default dtw.
+        :param descriptors: what description functions use to describe prototypes.
+        :param n_jobs: parallelization. Default None
+        :param verbose: verbosity level. Default 0
+        :param dims: number of dimensions/features in time series. Default 1
+        :param sampling_rate: sampling rate used to calculate dominant frequency. Default 1
+        :param feature_names: list of feature names. Default None
+        :param importance_aggregation_func: function to aggregate shap values. Default np.mean
         """
         self.threshold = 0  # threshold for discarding slices of time-series of low importance
         self.multiplier = multiplier
-        self.fixed_n_clusters = False
         self.n_clusters = {}
         self.jump = jump
         self.min_size = min_size
@@ -68,6 +67,7 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
         self.signal_ids_ = {}
         self.sampling_rate = sampling_rate
         self.weights_ = {}
+        self.importance_aggregation_func = importance_aggregation_func
 
         if self.method == 'kshapegpu':
             try:
@@ -82,12 +82,51 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
         else:
             self.feature_names = feature_names
 
-        if n_clusters is not None:
-            self.fixed_n_clusters = True
+        # Make the number of clusters be determined by the number of breakpoints in data
+        if n_clusters is None:
+            n_clusters = 1
+
+        # If the n_clusters was given but it is not dict, assign same number of clusters to all
+        # dmiensions. It can be a fraction, which will make the algorithm determine the optimal number of clusters
+        # while fitting. The fraction represetns the desired granularity of clustersng.
+        # Otherwise, just assigne the dict to self.n_clusters this allows for a mixture of
+        # fixed number of clusters and fractions (automatic detection)
+        if not isinstance(n_clusters, dict):
             for dim in range(dims):
                 self.n_clusters[self.feature_names[dim]] = n_clusters
+        else:
+            self.n_clusters = n_clusters
 
     def fit(self, X, y=None, shapclass=None):
+        """ Fits model to the training data
+
+        :param X:
+        :type X: array-like, shape (n_samples, n_timestamps, n_features)
+        :param y: not used, kept only for the compliance with scikit-learn API
+        :type y: array-like
+        :param shapclass: SHAP value calculated for the blackbox model to be explained.
+        It is assumed that the mean absolute values are passed here.
+        :type shapclass: array-like, shape (n_samples,n_timestamps,)
+        :return:
+        """
+        if y is not None and shapclass is None:
+            shapclass = y
+        return self._transform(X, shapclass, refit=True, transform=False)
+
+    def transform(self, X, y=None, shapclass=None):
+        """
+
+        :param X:
+        :param y:
+        :param shapclass:
+        :return:
+        """
+
+        if y is not None and shapclass is None:
+            shapclass = y
+        return self._transform(X, shapclass, refit=False, transform=True)
+
+    def fit_transform(self, X, y=None, shapclass=None):
         """
 
         :param X:
@@ -97,19 +136,17 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
         """
         if y is not None and shapclass is None:
             shapclass = y
-        return self._transform(X, shapclass, refit=True, transform=False)
-
-    def transform(self, X, y=None, shapclass=None):
-        if y is not None and shapclass is None:
-            shapclass = y
-        return self._transform(X, shapclass, refit=False, transform=True)
-
-    def fit_transform(self, X, y=None, shapclass=None):
-        if y is not None and shapclass is None:
-            shapclass = y
         return self._transform(X, shapclass, refit=True, transform=True)
 
     def _transform(self, Xdim, shap_dim, refit=False, transform=True):
+        """
+
+        :param Xdim:
+        :param shap_dim:
+        :param refit:
+        :param transform:
+        :return:
+        """
         train_dim = []
         features = []
         if self.verbose > 0:
@@ -120,62 +157,79 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
         for dim in range(0, Xdim.shape[2]):
             totalslice = []
             totalsslice = []
+            totalbpoints = []
             indexes = []
             print(f'Dim: {dim}')
             X = Xdim[:, :, dim].reshape((Xdim.shape[0], Xdim.shape[1], 1))
             shapclass = shap_dim[:, :, dim].reshape((shap_dim.shape[0], shap_dim.shape[1], 1))
-            mean_bkps = 0
+            sum_bkps = 0
             for i in range(0, X.shape[0]):
                 algo = rpt.Pelt(model="rbf", min_size=self.min_size, jump=self.jump).fit(shapclass[i])
                 breakpoints = algo.predict(pen=1)
-                mean_bkps += len(breakpoints)
-                # shapslices = [np.mean(abs(s)) for s in np.split(shapclass[i],breakpoints) if len(s) != 0]
+                sum_bkps += len(breakpoints)
                 shapslices = [abs(s) for s in np.split(shapclass[i], breakpoints) if
                               len(s) != 0]  # (assuming this is abshap over all classses)
                 slices = [s for s in np.split(X[i], breakpoints) if len(s) != 0]
+                bpoints = [0] + [s for s in breakpoints if s < len(X[i]) and s > 0]
+
                 totalsslice.append(shapslices)
                 totalslice.append(slices)
+                totalbpoints.append(bpoints)
                 indexes.append(np.ones(len(slices)) * i)
 
             print(len(totalsslice[0]))
             print(len(totalslice[0]))
             print(len(indexes[0]))
+            print(len(totalbpoints[0]))
 
             ############ overriding clusters\
-            if refit and (not self.fixed_n_clusters or self.fixed_n_clusters <= 1):
-                self.n_clusters[self.feature_names[dim]] = max(2,
-                                                               int(int(mean_bkps / X.shape[0]) * self.fixed_n_clusters))
+            if refit and (self.n_clusters[self.feature_names[dim]] <= 1):
+                self.n_clusters[self.feature_names[dim]] = max(2, int(int(sum_bkps / X.shape[0]) * self.n_clusters[
+                    self.feature_names[dim]]))
                 print(f'For {self.feature_names[dim]} c_clusters = {self.n_clusters[self.feature_names[dim]]}')
 
             ############# .
             if refit:
                 if self.multiplier is not None:
-                    concat_sslices = np.concatenate([item for sublist in totalsslice for item in sublist])
-                    self.thresholds_[dim] = np.mean(concat_sslices) - self.multiplier * np.std(concat_sslices)
+                    mean_concat_sslices = np.array(
+                        [self.importance_aggregation_func(item) for sublist in totalsslice for item in sublist])
+                    self.thresholds_[dim] = np.mean(mean_concat_sslices) - self.multiplier * np.std(mean_concat_sslices)
                 else:
                     self.thresholds_[dim] = 0
 
             # ante-hoc filtering
+            print(f'Before filtering no sigids: {(len(np.unique(np.concatenate(indexes))))}, uniqu {0}')
             if self.thresholds_[dim] > 0:
-                indexed_slices = [[i, s, ss] for ts, tss, ti in zip(totalslice, totalsslice, indexes) for s, ss, i in
-                                  zip(ts, tss, ti) if ss > self.thresholds_[dim]]
+                indexed_slices = [[i, s, ss, bp] for ts, tss, ti, bpi in zip(totalslice, totalsslice, indexes, bpoints)
+                                  for s, ss, i, bp in zip(ts, tss, ti, bpi) if
+                                  self.importance_aggregation_func(abs(ss)) >= self.thresholds_[dim]]
                 isdf = pd.DataFrame(indexed_slices)
-                indexes = isdf.loc[:, 0]
-                if len(np.unique(indexes)) < (np.max(indexes) - 1):
+                indexes_new = isdf.loc[:, 0]
+                print(
+                    f'Unique indexes: {len(np.unique(indexes_new))} vs max+1: {(len(np.unique(np.concatenate(indexes))))}')
+                if len(np.unique(indexes_new)) < (len(np.unique(np.concatenate(indexes)))):
                     # in case there is a signal that has absolutely no readings
                     # reduce the threshold
                     print('WARNING: Changing the threshold, due to empty record')
-                    isdf = pd.DataFrame(indexed_slices, columns=['index', 'slice', 'shapslice'])
-                    self.thresholds_[dim] = isdf.groupby('index')['shapslice'].max().min()
-                    indexed_slices = [[i, s, ss] for ts, tss, ti in zip(totalslice, totalsslice, indexes) for s, ss, i
-                                      in zip(ts, tss, ti) if ss > self.thresholds_[dim]]
+                    full_slices = [[i, s, ss, bp] for ts, tss, ti, bpi in zip(totalslice, totalsslice, indexes, bpoints)
+                                   for s, ss, i, bp in zip(ts, tss, ti, bpi)]
+                    isdf = pd.DataFrame(full_slices, columns=['index', 'slice', 'shapslice', 'breakpoint'])
+                    isdf['maxshap'] = isdf['shapslice'].apply(lambda x: np.mean(abs(x)))
+                    self.thresholds_[dim] = isdf.groupby('index')['maxshap'].max().min()
+                    indexed_slices = [[i, s, ss, bp] for ts, tss, ti, bpi in
+                                      zip(totalslice, totalsslice, indexes, bpoints) for s, ss, i, bp in
+                                      zip(ts, tss, ti, bpi) if
+                                      self.importance_aggregation_func(abs(ss)) >= self.thresholds_[dim]]
+                    print(f'Threshold: {self.thresholds_[dim]}')
                     isdf = pd.DataFrame(indexed_slices)
                 indexes = list(isdf.groupby(0)[0].apply(np.array))
                 totalslice = list(isdf.groupby(0)[1].apply(list))
                 totalsslice = list(isdf.groupby(0)[2].apply(list))
+                totalbpoints = list(isdf.groupby(0)[3].apply(np.array))
 
             ############# post-hoc filtering
             # TODO: filter whole clusters which average/max importance is below certain point
+            print(f'After removing , no sigids: {(len(np.unique(np.concatenate(indexes))))}, uniqu {0}')
 
             totalslice = [item for sublist in totalslice for item in sublist]
             totalsslice = [item for sublist in totalsslice for item in
@@ -278,17 +332,19 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
                 return self
 
             Xdf['cluster'] = labels
-            Xdf['shapweight'] = np.array([mean(abs(sv)) for sv in totalsslice])
+            Xdf['shapweight'] = np.array([self.importance_aggregation_func(abs(sv)) for sv in totalsslice])
+            Xdf['startpoint'] = np.array([b for b in totalbpoints])
             Xdf['durations'] = X_bis_o.shape[1] - np.sum(np.isnan(X_bis), axis=1)
 
             Xdf['min'] = np.nanmin(X_bis, axis=1)
             Xdf['max'] = np.nanmax(X_bis, axis=1)
             Xdf['mean'] = np.nanmean(X_bis, axis=1)
             Xdf['std'] = np.nanstd(X_bis, axis=1)
-            Xdf['frequency'] = dominant_frequencies_for_rows(X_bis, sampling_rate=self.sampling_rate)
+            Xdf['frequency'] = dominant_frequencies_for_rows(X_bis, sampling_rate=self.sampling_rate_)
 
             phantom = pd.DataFrame({'sigid': [-1] * len(self.label_features_[dim]),
                                     'cluster': np.arange(0, len(self.label_features_[dim])),
+                                    'startpoint': np.arange(0, len(self.label_features_[dim])),
                                     'durations': [0] * len(self.label_features_[dim]),
                                     'min': [0] * len(self.label_features_[dim]),
                                     'max': [0] * len(self.label_features_[dim]),
@@ -302,14 +358,17 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
 
             ohe_train = pd.pivot_table(Xdfp, index='sigid', columns='cluster', values='durations',
                                        aggfunc=lambda x: sum(~np.isnan(x))).fillna(0).astype(int)
+            startpoint = pd.pivot_table(Xdfp, index='sigid', columns='cluster', values='startpoint',
+                                        aggfunc='min').fillna(0).astype(int)
             duration_train = pd.pivot_table(Xdfp, index='sigid', values='durations', columns='cluster').fillna(
-                0)  # TODO: wrong aggfunc
+                0)  # TODO: wrong aggfunc?
             min_train = pd.pivot_table(Xdfp, index='sigid', values='min', columns='cluster').fillna(0)
             max_train = pd.pivot_table(Xdfp, index='sigid', values='max', columns='cluster').fillna(0)
             mean_train = pd.pivot_table(Xdfp, index='sigid', values='mean', columns='cluster').fillna(0)
             std_train = pd.pivot_table(Xdfp, index='sigid', values='std', columns='cluster').fillna(0)
             frequency_train = pd.pivot_table(Xdfp, index='sigid', values='frequency', columns='cluster').fillna(0)
-            self.weights_[dim] = Xdf.groupby('sigid')['shapweight'].mean().values
+            self.weights_[dim] = Xdf.groupby('sigid')['shapweight'].apply(self.importance_aggregation_func).values
+            print(f'Shape weights: {self.weights_[dim].shape}')
 
             # print(f'Columns: {ohe_train.columns}')
 
@@ -327,10 +386,11 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
                                  range(0, len(self.label_features_[dim]))]
             frequency_train.columns = [f'frequency_cl_{c}_{self.feature_names[dim]}' for c in
                                        range(0, len(self.label_features_[dim]))]
+            startpoint.columns = [f'startpoint_cl_{c}_{self.feature_names[dim]}' for c in
+                                  range(0, len(self.label_features_[dim]))]
 
             train = pd.concat((ohe_train, duration_train, min_train, max_train, mean_train, std_train, frequency_train),
                               axis=1)
-
             train = train[~train.index.isin([-1])]
 
             if 'existance' in self.descriptors:
@@ -345,7 +405,7 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
 
             train_dim.append(train)
 
-        train = pd.concat(train_dim, axis=1)
+        train = pd.concat(train_dim, axis=1).fillna(0)
         target = 'target'
 
         print(f'Len X={len(X)} vs len of train = {len(train)}')
@@ -357,8 +417,18 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
         if self.verbose > 0:
             end_time = time.time()
             print(f'Done in {(end_time - start_time)}.')
-        weights = pd.DataFrame(self.weights_).sum(axis=1).values
+        weights = pd.DataFrame(pad_arrays_in_dict(self.weights_)).sum(axis=1).values
         return train, features, target, weights
+
+def pad_arrays_in_dict(array_dict):
+    # Find the maximum length among the arrays
+    max_length = max(len(array) for array in array_dict.values())
+
+    # Pad arrays with zeros to make them of equal length
+    padded_arrays = {label: np.pad(array, (0, max_length - len(array)), mode='constant', constant_values=0)
+                     for label, array in array_dict.items()}
+
+    return padded_arrays
 
 
 class InterpretableModel:
