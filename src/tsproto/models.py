@@ -67,6 +67,7 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
         self.signal_ids_ = {}
         self.sampling_rate = sampling_rate
         self.weights_ = {}
+        self.seq_len_ = {}
         self.importance_aggregation_func = importance_aggregation_func
 
         if self.method == 'kshapegpu':
@@ -255,16 +256,16 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
             if not refit:
                 if self.method != 'dtw':
                     cur_seq_len = X_bis_o.shape[1]
-                    if cur_seq_len < self.seq_len:
-                        diff = self.seq_len - cur_seq_len
+                    if cur_seq_len < self.seq_len_[dim]:
+                        diff = self.seq_len_[dim] - cur_seq_len
                         if len(X_bis_o.shape) == 3:
                             expand = np.zeros((X_bis_o.shape[0], diff, X_bis_o.shape[2]))
                         elif len(X_bis.shape) == 2:
                             expand = np.zeros((X_bis_o.shape[0], diff))
                         X_bis = np.append(X_bis_o, expand, axis=1)
                         X_bis_shap = np.append(X_bis_o_shap, expand, axis=1)
-                    elif cur_seq_len > self.seq_len:
-                        diff = cur_seq_len - self.seq_len
+                    elif cur_seq_len > self.seq_len_[dim]:
+                        diff = cur_seq_len - self.seq_len_[dim]
                         X_bis = np.delete(X_bis_o, slice(X_bis_o.shape[1] - diff, None), 1)
                         X_bis_shap = np.delete(X_bis_o_shap, slice(X_bis_o_shap.shape[1] - diff, None), 1)
                     else:
@@ -312,7 +313,7 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
                     self.kms_[dim] = KMeans(n_clusters=self.n_clusters[self.feature_names[dim]])
 
                 print(f'X_bis shape: {X_bis.shape} for method={self.method}')
-                self.seq_len = X_bis.shape[1]
+                self.seq_len_[dim]=X_bis.shape[1]
 
                 self.kms_[dim].fit(X_bis)
 
