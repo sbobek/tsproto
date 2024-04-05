@@ -207,7 +207,7 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
             # ante-hoc filtering
             print(f'Before filtering no sigids: {(len(np.unique(np.concatenate(indexes))))}, uniqu {0}')
             if self.thresholds_[dim] > 0:
-                indexed_slices = [[i, s, ss, bp] for ts, tss, ti, bpi in zip(totalslice, totalsslice, indexes, bpoints)
+                indexed_slices = [[i, s, ss, bp] for ts, tss, ti, bpi in zip(totalslice, totalsslice, indexes, totalbpoints)
                                   for s, ss, i, bp in zip(ts, tss, ti, bpi) if
                                   self.importance_aggregation_func(abs(ss)) >= self.thresholds_[dim]]
                 isdf = pd.DataFrame(indexed_slices)
@@ -218,13 +218,13 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
                     # in case there is a signal that has absolutely no readings
                     # reduce the threshold
                     print('WARNING: Changing the threshold, due to empty record')
-                    full_slices = [[i, s, ss, bp] for ts, tss, ti, bpi in zip(totalslice, totalsslice, indexes, bpoints)
+                    full_slices = [[i, s, ss, bp] for ts, tss, ti, bpi in zip(totalslice, totalsslice, indexes, totalbpoints)
                                    for s, ss, i, bp in zip(ts, tss, ti, bpi)]
                     isdf = pd.DataFrame(full_slices, columns=['index', 'slice', 'shapslice', 'breakpoint'])
                     isdf['maxshap'] = isdf['shapslice'].apply(lambda x: np.mean(abs(x)))
                     self.thresholds_[dim] = isdf.groupby('index')['maxshap'].max().min()
                     indexed_slices = [[i, s, ss, bp] for ts, tss, ti, bpi in
-                                      zip(totalslice, totalsslice, indexes, bpoints) for s, ss, i, bp in
+                                      zip(totalslice, totalsslice, indexes, totalbpoints) for s, ss, i, bp in
                                       zip(ts, tss, ti, bpi) if
                                       self.importance_aggregation_func(abs(ss)) >= self.thresholds_[dim]]
                     print(f'Threshold: {self.thresholds_[dim]}')
@@ -354,7 +354,7 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
             Xdf['max'] = np.nanmax(X_bis, axis=1)
             Xdf['mean'] = np.nanmean(X_bis, axis=1)
             Xdf['std'] = np.nanstd(X_bis, axis=1)
-            Xdf['frequency'] = dominant_frequencies_for_rows(X_bis, sampling_rate=self.sampling_rate_)
+            Xdf['frequency'] = dominant_frequencies_for_rows(X_bis, sampling_rate=self.sampling_rate)
 
             phantom = pd.DataFrame({'sigid': [-1] * len(self.label_features_[dim]),
                                     'cluster': np.arange(0, len(self.label_features_[dim])),
