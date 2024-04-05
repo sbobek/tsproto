@@ -316,6 +316,11 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
 
                 self.kms_[dim].fit(X_bis)
 
+                if self.method == 'kshape':
+                    self.kms_[dim].cluster_centers_ = self.kms_[dim].centroids_
+                if self.method == 'kshapegpu':
+                    self.kms_[dim].cluster_centers_ = self.kms_[dim].centroids_.detach().cpu()
+
                 self.xbis_[self.feature_names[dim]] = X_bis
                 self.xbis_shap_[self.feature_names[dim]] = X_bis_shap
                 self.xbis_cluster_labels_[self.feature_names[dim]] = self.kms_[dim].labels_
