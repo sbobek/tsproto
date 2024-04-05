@@ -97,8 +97,13 @@ def plot_barycenter_with_histogram(X_train, X_train_sigids, X_train_shap, cluste
     elif stat_function == 'exists':
         cluster_values = None
         stat_name = "Number of occurence"
+    elif stat_function == 'strartpoint':
+        cdata = X_train[cluster_labels == cluster_index]
+        cluster_values = np.nanmin(X_train[cluster_labels == cluster_index], axis=1)
+        stat_name = 'startpoint'
     else:
-        raise ValueError("Invalid stat_function. Choose from 'max', 'min', 'std', 'mean', or 'duration'.")
+        raise ValueError(
+            "Invalid stat_function. Choose from 'max', 'min', 'std', 'mean', 'duration' or startpoint.")
 
     Xdf = pd.DataFrame(cluster_values, columns=['cluster_values'])
     Xdf['sigid'] = X_train_sigids[cluster_labels == cluster_index]
