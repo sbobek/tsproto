@@ -221,7 +221,7 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
                     full_slices = [[i, s, ss, bp] for ts, tss, ti, bpi in zip(totalslice, totalsslice, indexes, totalbpoints)
                                    for s, ss, i, bp in zip(ts, tss, ti, bpi)]
                     isdf = pd.DataFrame(full_slices, columns=['index', 'slice', 'shapslice', 'breakpoint'])
-                    isdf['maxshap'] = isdf['shapslice'].apply(lambda x: np.mean(abs(x)))
+                    isdf['maxshap'] = isdf['shapslice'].apply(lambda x: self.importance_aggregation_func(abs(x)))
                     self.thresholds_[dim] = isdf.groupby('index')['maxshap'].max().min()
                     indexed_slices = [[i, s, ss, bp] for ts, tss, ti, bpi in
                                       zip(totalslice, totalsslice, indexes, totalbpoints) for s, ss, i, bp in
@@ -322,9 +322,9 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
                 if self.method == 'kshapegpu':
                     self.kms_[dim].cluster_centers_ = self.kms_[dim].centroids_.detach().cpu()
 
-                self.xbis_[self.feature_names[dim]] = X_bis
-                self.xbis_shap_[self.feature_names[dim]] = X_bis_shap
-                self.xbis_cluster_labels_[self.feature_names[dim]] = self.kms_[dim].labels_
+            self.xbis_[self.feature_names[dim]] = X_bis
+            self.xbis_shap_[self.feature_names[dim]] = X_bis_shap
+            self.xbis_cluster_labels_[self.feature_names[dim]] = self.kms_[dim].labels_
 
             if self.verbose > 0:
                 end_time = time.time()
@@ -333,14 +333,14 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
                 print(f'OHE time series')
             signal = np.concatenate(indexes)
             Xdf = pd.DataFrame(signal, columns=['sigid'])
+            self.signal_ids_[self.feature_names[dim]] = np.concatenate(indexes)
 
             if refit:
                 labels = self.kms_[dim].labels_
                 self.label_features_[dim] = np.arange(0, np.max(labels) + 1)
-                self.signal_ids_[self.feature_names[dim]] = np.concatenate(indexes)
             else:
                 labels = self.kms_[dim].predict(X_bis)
-                # todo xbis and cluster centers should be changed here?
+                self.xbis_cluster_labels_[self.feature_names[dim]] = labels
 
             if not transform:
                 return self
@@ -373,7 +373,7 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
             ohe_train = pd.pivot_table(Xdfp, index='sigid', columns='cluster', values='durations',
                                        aggfunc=lambda x: sum(~np.isnan(x))).fillna(0).astype(int)
             startpoint_train = pd.pivot_table(Xdfp, index='sigid', columns='cluster', values='startpoint',
-                                              aggfunc='min').fillna(0).astype(int)
+                                              aggfunc='min').fillna(-1).astype(int)
             duration_train = pd.pivot_table(Xdfp, index='sigid', values='durations', columns='cluster').fillna(
                 0)  # TODO: wrong aggfunc?
             min_train = pd.pivot_table(Xdfp, index='sigid', values='min', columns='cluster').fillna(0)
