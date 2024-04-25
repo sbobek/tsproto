@@ -12,7 +12,7 @@ from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_sc
 from sklearn.base import BaseEstimator, TransformerMixin
 import numpy as np
 import pandas as pd
-from tsproto.utils import dominant_frequencies_for_rows
+from tsproto.utils import dominant_frequencies_for_rows, calculate_trends
 
 """
 Documentation of this module
@@ -69,6 +69,7 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
         self.weights_ = {}
         self.seq_len_ = {}
         self.importance_aggregation_func = importance_aggregation_func
+        self._changepoint_sensitivity = 1  # FX3
 
         if self.method == 'kshapegpu':
             try:
@@ -168,7 +169,7 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
                 algo = rpt.Pelt(model="rbf", min_size=self.min_size, jump=self.jump).fit(shapclass[i])
 
                 try:
-                    breakpoints = algo.predict(pen=1)
+                    breakpoints = algo.predict(pen=0.25*X.shape[1]**(1-self._changepoint_sensitivity)*2*np.log(X.shape[1]))
                 except:
                     # no change detected, means there are no breakpoints
                     breakpoints = [0]
@@ -354,6 +355,7 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
             Xdf['max'] = np.nanmax(X_bis, axis=1)
             Xdf['mean'] = np.nanmean(X_bis, axis=1)
             Xdf['std'] = np.nanstd(X_bis, axis=1)
+            Xdf['trend'] = calculate_trends(X_bis)  # FX3
             Xdf['frequency'] = dominant_frequencies_for_rows(X_bis, sampling_rate=self.sampling_rate)
 
             phantom = pd.DataFrame({'sigid': [-1] * len(self.label_features_[dim]),
@@ -364,6 +366,7 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
                                     'max': [0] * len(self.label_features_[dim]),
                                     'mean': [0] * len(self.label_features_[dim]),
                                     'std': [0] * len(self.label_features_[dim]),
+                                    'trend': [0] * len(self.label_features_[dim]),
                                     'frequency': [0] * len(self.label_features_[dim])
                                     })
 
@@ -380,6 +383,7 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
             max_train = pd.pivot_table(Xdfp, index='sigid', values='max', columns='cluster').fillna(0)
             mean_train = pd.pivot_table(Xdfp, index='sigid', values='mean', columns='cluster').fillna(0)
             std_train = pd.pivot_table(Xdfp, index='sigid', values='std', columns='cluster').fillna(0)
+            trend_train = pd.pivot_table(Xdfp, index='sigid', values='trend', columns='cluster').fillna(0)
             frequency_train = pd.pivot_table(Xdfp, index='sigid', values='frequency', columns='cluster').fillna(0)
             self.weights_[dim] = Xdf.groupby('sigid')['shapweight'].apply(self.importance_aggregation_func).values
             print(f'Shape weights: {self.weights_[dim].shape}')
@@ -398,13 +402,14 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
                                   range(0, len(self.label_features_[dim]))]
             std_train.columns = [f'std_cl_{c}_{self.feature_names[dim]}' for c in
                                  range(0, len(self.label_features_[dim]))]
+            trend_train.columns = [f'trend_cl_{c}_{self.feature_names[dim]}' for c in
+                                   range(0, len(self.label_features_[dim]))]
             frequency_train.columns = [f'frequency_cl_{c}_{self.feature_names[dim]}' for c in
                                        range(0, len(self.label_features_[dim]))]
             startpoint_train.columns = [f'startpoint_cl_{c}_{self.feature_names[dim]}' for c in
                                         range(0, len(self.label_features_[dim]))]
 
-            train = pd.concat((ohe_train, duration_train, min_train, max_train, mean_train, std_train, frequency_train,
-                               startpoint_train), axis=1)
+            train = pd.concat((ohe_train, duration_train,min_train,max_train,mean_train,std_train,trend_train,frequency_train,startpoint_train),axis=1)
             train = train[~train.index.isin([-1])]
 
             if 'existance' in self.descriptors:
@@ -413,7 +418,7 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
                 features = features + list(duration_train.columns) + list(startpoint_train.columns)
             if 'stats' in self.descriptors:
                 features = features + list(min_train.columns) + list(max_train.columns) + list(
-                    mean_train.columns) + list(std_train.columns)
+                    mean_train.columns) + list(std_train.columns)+list(trend_train.columns)
             if 'frequency' in self.descriptors:
                 features = features + list(frequency_train.columns)
 

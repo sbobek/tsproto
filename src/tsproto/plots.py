@@ -83,6 +83,9 @@ def plot_barycenter_with_histogram(X_train, X_train_sigids, X_train_shap, cluste
     elif stat_function == 'std':
         cluster_values = np.nanstd(X_train[cluster_labels == cluster_index], axis=1)
         stat_name = "Standard Deviation"
+    elif stat_function == 'trend':  #
+        cluster_values = np.nanmean(X_train[cluster_labels == cluster_index], axis=1)
+        stat_name = "Trend"
     elif stat_function == 'mean':
         cluster_values = np.nanmean(X_train[cluster_labels == cluster_index], axis=1)
         stat_name = "Mean"
@@ -140,6 +143,7 @@ def plot_barycenter_with_histogram(X_train, X_train_sigids, X_train_shap, cluste
         # Calculate x-axis values for the current array
         array = array[~np.isnan(array)]
         x_values = np.arange(start_point, start_point + len(array))
+        ax[0].axvline(x=start_point, color='r', linestyle='--')
 
         # Plot the array with the specified color
         if i in cluster_part:

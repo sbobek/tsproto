@@ -1,6 +1,6 @@
 import numpy as np
 import shap
-
+from scipy.stats import linregress
 from tsproto.windowshap import SlidingWindowSHAP
 
 """
@@ -104,3 +104,27 @@ def getshap(model, X, y, shap_version='deep', bg_size=1000, stride=10, window_le
                 sv_tr.append([shap_values_tr[indexer[i]][i, :]])
             sv_tr = np.concatenate(sv_tr)
         return background_data,sv_tr
+
+
+
+
+
+def calculate_trends(series_of_arrays):
+    trends = []
+    for array in series_of_arrays:
+        # Use np.arange for the x-values assuming each element's index is its x-value
+        x = np.arange(len(array))
+
+        # Filter out NaNs from the data
+        mask = ~np.isnan(array[:, 0])
+        x_filtered = x[mask]
+        y_filtered = array[mask, 0]
+
+        if len(x_filtered) > 1:  # Need at least two points to calculate a trend
+            slope, _, _, _, _ = linregress(x_filtered, y_filtered)
+            trends.append(slope)
+        else:
+            # Append None or np.nan if it's not possible to calculate a trend
+            trends.append(np.nan)
+
+    return trends
