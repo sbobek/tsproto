@@ -116,7 +116,12 @@ def plot_barycenter_with_histogram(X_train, X_train_sigids, X_train_shap, cluste
     Xdf['target'] = target_column[cluster_labels == cluster_index]
     if stat_function != 'exists':
         Xdfgr = Xdf.groupby('sigid')
-        cluster_values = Xdfgr['cluster_values'].mean().values  # average maximum value. this could be median
+        if stat_function in ['min', 'startpoint']:
+            cluster_values = Xdfgr['cluster_values'].min().values
+        elif stat_function == 'max':
+            cluster_values = Xdfgr['cluster_values'].max().values
+        else:
+            cluster_values = Xdfgr['cluster_values'].mean().values
         target_column = Xdfgr['target'].first().values
         X_train = X_train[cluster_labels == cluster_index]
     else:
@@ -169,20 +174,6 @@ def plot_barycenter_with_histogram(X_train, X_train_sigids, X_train_shap, cluste
                  extent=[0, len(shap_sample), min(reference_value_sampe.ravel()), max(reference_value_sampe.ravel())],
                  alpha=0.3)
 
-    # Contrastive examples (the one that does not have that cluster)
-    # if there are some sigids that do not contain the cluster
-
-    # get opposite class exmaples
-
-    # if len(nXdf['sigid']) >0:
-    #     sample_mask = X_train_sigids==nXdf['sigid'].iloc[0]
-    #     full_sample_a = X_train_full[sample_mask]
-    #     full_sample = np.concatenate(full_sample_a)
-    #     full_sample=full_sample[~np.isnan(full_sample)]
-    #     ax[0].plot(full_sample,"green", alpha=0.5)
-
-    #     print(cluster_labels[sample_mask])
-    # else:
 
     if target_column is not None:
         # Plot individual time series and barycenter

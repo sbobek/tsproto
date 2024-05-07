@@ -13,6 +13,9 @@ from sklearn.base import BaseEstimator, TransformerMixin
 import numpy as np
 import pandas as pd
 from tsproto.utils import dominant_frequencies_for_rows, calculate_trends
+from sktime.transformations.panel.rocket import MiniRocket
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
 
 """
 Documentation of this module
@@ -35,8 +38,9 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
         :param jump: subsample (one every jump points) (Pelt algorithm parameter)
         :param pen: penalty value (>0) (Pelt algorithm parameter)
         :param n_clusters: number of clusters to generated (these are going to be prototypes). It can be int, float or dict.
+        If float, the number of clusters is determined dynamically as a product of the parameter and the average number of breakpoints detected in the particualr dimension.
         :param multiplier: multiplier used in outlier deteciton. The smaller the value the stronger reduction of outliers
-        :param method: clustering algorithms method. Default dtw.
+        :param method: clustering algorithms method. Default dtw. Possible options: ['dtw','kshape','tskshape','rocket','kmeans','rocket']
         :param descriptors: what description functions use to describe prototypes.
         :param n_jobs: parallelization. Default None
         :param verbose: verbosity level. Default 0
@@ -191,7 +195,7 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
             print(len(totalbpoints[0]))
 
             ############ overriding clusters\
-            if refit and (self.n_clusters[self.feature_names[dim]] <= 1):
+            if refit and (self.n_clusters[self.feature_names[dim]]<=1 or isinstance(self.n_clusters[self.feature_names[dim]],float)):
                 self.n_clusters[self.feature_names[dim]] = max(2, int(int(sum_bkps / X.shape[0]) * self.n_clusters[
                     self.feature_names[dim]]))
                 print(f'For {self.feature_names[dim]} c_clusters = {self.n_clusters[self.feature_names[dim]]}')
@@ -255,7 +259,7 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
             print(X_bis_o_shap.shape)
 
             if not refit:
-                if self.method != 'dtw':
+                if self.method in ['dtw','rocket']:
                     cur_seq_len = X_bis_o.shape[1]
                     if cur_seq_len < self.seq_len_[dim]:
                         diff = self.seq_len_[dim] - cur_seq_len
@@ -312,6 +316,9 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
                     self.kms_[dim] = KShapeClusteringGPU(n_clusters=self.n_clusters[self.feature_names[dim]])
                 elif self.method == 'kmeans':
                     self.kms_[dim] = KMeans(n_clusters=self.n_clusters[self.feature_names[dim]])
+                elif self.method == 'rocket':
+                    self.kms_[dim] = RocketMeans(n_clusters=self.n_clusters[self.feature_names[dim]],
+                                                 n_jobs=self.n_jobs)
 
                 print(f'X_bis shape: {X_bis.shape} for method={self.method}')
                 self.seq_len_[dim]=X_bis.shape[1]
@@ -450,6 +457,24 @@ def pad_arrays_in_dict(array_dict):
 
     return padded_arrays
 
+class RocketMeans:
+
+    def __init__(self,n_clusters=2, n_kernels=512, n_components=150,n_jobs=1):
+        self.rocket = MiniRocket(num_kernels=n_kernels,n_jobs=n_jobs)
+        self.kmeans = KMeans(n_clusters=n_clusters)
+        self.pca = PCA(n_components=n_components)
+        self.scaler = StandardScaler()
+    def fit(self,X,y=None):
+        X = X.reshape(X.shape[0],1,X.shape[1])
+        Xr =self.rocket.fit_transform(X,y).fillna(0)
+        Xr=self.scaler.fit_transform(Xr)
+        Xrd = self.pca.fit_transform(Xr)
+        self.kmeans.fit(Xrd)
+        self.cluster_centers_ = None#self.rocket.inverse_transform(self.pca.inverse_transform(self.kmeans.cluster_centers_))
+        self.labels_ = self.kmeans.labels_
+    def predict(self,X):
+        X = X.reshape(X.shape[0],1,X.shape[1])
+        return self.kmeans.predict(self.pca.transform(self.scaler.transform(self.rocket.transform(X).fillna(0))))
 
 class InterpretableModel:
     def fit_or_predict(self, ohe_train, features, target, intclf=None, verbose=0, max_depth=None, min_samples_leaf=0.05,

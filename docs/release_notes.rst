@@ -1,10 +1,12 @@
 Release notes
 =============
 
-0.2.1 (2024-04-17)
+0.2.1 (2024-05-06)
 -------------
-
+* Added support for ROCKET-based clustering with sktime 0.29.0
+* Bugfix with incorrect visualization reported in #9
 * Bugfix with internal data not updating after transform (this is needed for the visualization)
+* Added feature of dynamic cluster determination when float is provided as n_clusters parameter
 
 
 0.2.0 (2024-04-05)
