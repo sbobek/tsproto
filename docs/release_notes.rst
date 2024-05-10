@@ -3,6 +3,7 @@ Release notes
 
 0.2.1 (2024-05-06)
 -------------
+* Added changepoint_sensitivity instead of pen parameter. NOw, the pen parameter is estimated automatically
 * Added support for ROCKET-based clustering with sktime 0.29.0
 * Bugfix with incorrect visualization reported in #9
 * Bugfix with internal data not updating after transform (this is needed for the visualization)

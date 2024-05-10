@@ -28,7 +28,7 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
     Encodes time-series into prototypes
     """
 
-    def __init__(self, blackbox, min_size, jump, pen, n_clusters, multiplier=1.5, method='dtw',
+    def __init__(self, blackbox, min_size, jump, changepoint_sensitivity, n_clusters, multiplier=1.5, method='dtw',
                  descriptors=['existance', 'duration', 'stats', 'startpoint'], n_jobs=None, verbose=0,
                  dims=1, sampling_rate=1, feature_names=None, importance_aggregation_func=np.mean):
         """ Initializes PrototypeEncoder class
@@ -36,7 +36,7 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
         :param blackbox: instance of a blackbox model that is to be explained
         :param min_size: minimum size of a prototype (Pelt algorithm parameter)
         :param jump: subsample (one every jump points) (Pelt algorithm parameter)
-        :param pen: penalty value (>0) (Pelt algorithm parameter)
+        :param changepoint_sensitivity: sensitivity for penalty value (>0)  for Pelt algorithm parameter. The penalty is calculated as 0.25 * X.shape[1] ** (1 - changepoint_sensitivity) * 2 * np.log(X.shape[1]), which corresponds to BIC when changepoint_sensitivity equals 1.
         :param n_clusters: number of clusters to generated (these are going to be prototypes). It can be int, float or dict.
         If float, the number of clusters is determined dynamically as a product of the parameter and the average number of breakpoints detected in the particualr dimension.
         :param multiplier: multiplier used in outlier deteciton. The smaller the value the stronger reduction of outliers
@@ -57,7 +57,6 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
         self.method = method
         self.n_jobs = n_jobs
         self.verbose = verbose
-        self.pen = pen
         self.dims = dims
         self.blackbox = blackbox
         self.descriptors = descriptors
@@ -73,7 +72,7 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
         self.weights_ = {}
         self.seq_len_ = {}
         self.importance_aggregation_func = importance_aggregation_func
-        self._changepoint_sensitivity = 1  # FX3
+        self.changepoint_sensitivity = changepoint_sensitivity
 
         if self.method == 'kshapegpu':
             try:
@@ -173,7 +172,7 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
                 algo = rpt.Pelt(model="rbf", min_size=self.min_size, jump=self.jump).fit(shapclass[i])
 
                 try:
-                    breakpoints = algo.predict(pen=0.25*X.shape[1]**(1-self._changepoint_sensitivity)*2*np.log(X.shape[1]))
+                    breakpoints = algo.predict(pen=0.25 * X.shape[1] ** (1 - self.changepoint_sensitivity) * 2 * np.log(X.shape[1]))
                 except:
                     # no change detected, means there are no breakpoints
                     breakpoints = [0]
