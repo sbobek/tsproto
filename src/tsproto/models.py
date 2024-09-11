@@ -17,6 +17,8 @@ from sktime.transformations.panel.rocket import MiniRocket
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from sklearn_extra.cluster import KMedoids
+from sktime.transformations.panel.shapelet_transform import RandomShapeletTransform
+from sktime.datatypes._panel._convert import from_3d_numpy_to_nested
 
 max_float32 = np.finfo(np.float32).max
 min_float32 = np.finfo(np.float32).min
@@ -574,15 +576,11 @@ class InterpretableModel:
                 intclf)
 
 
-import numpy as np
-import pandas as pd
-from sktime.transformations.panel.shapelet_transform import RandomShapeletTransform
-from sktime.datatypes._panel._convert import from_3d_numpy_to_nested
+
 
 
 class ShapeletClustering:
     def __init__(self, max_shapelets=None, min_shapelet_length=5, max_shapelet_length=30, random_state=None):
-        print(f'_________________Min shapelet lenth: {min_shapelet_length}')
         self.shapelet_transform = RandomShapeletTransform(
             max_shapelets=max_shapelets,
             min_shapelet_length=min_shapelet_length,
@@ -601,7 +599,6 @@ class ShapeletClustering:
         # Fit the shapelet transform
         self.XX = X
         self.yy = y
-        print(f'Fit: {X.shape}')
         X = self.preprocess_(X)
         self.shapelet_transform.fit(X, y)
         self.fitted = True
@@ -613,7 +610,6 @@ class ShapeletClustering:
         if not self.fitted:
             raise ValueError(
                 "The ShapeletTransformer is not fitted yet. Call 'fit' with appropriate arguments before using this method.")
-        print(f'Transform: {X.shape}')
         if preprocess:
             X = self.preprocess_(X)
         # Transform the input data using the fitted shapelet transform
@@ -624,7 +620,6 @@ class ShapeletClustering:
             raise ValueError(
                 "The ShapeletTransformer is not fitted yet. Call 'fit' with appropriate arguments before using this method.")
 
-        print(f'Predict: {X.shape}')
         if preprocess:
             X = self.preprocess_(X)
         # Calculate distances to each shapelet and find the shapelet with the minimal distance
