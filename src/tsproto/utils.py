@@ -93,15 +93,22 @@ def getshap(model, X, y, shap_version='deep', bg_size=1000, stride=10, window_le
         explainer = shap.DeepExplainer(model, background_data)
         shap_values_tr = explainer.shap_values(X, check_additivity=False)
         if absshap:
-            sv_tr = abs(np.array(shap_values_tr)).mean(
-                axis=0)  # This basically returns the average importance over the feature/sample
-            # Not taking into account the sign of shap value, as it is not required
-            # for breakpoints calculation
+            if isinstance(shap_values_tr,list):
+                sv_tr = abs(np.array(shap_values_tr)).mean(
+                    axis=0)  # This basically returns the average importance over the feature/sample
+                # Not taking into account the sign of shap value, as it is not required
+                # for breakpoints calculation
+            else:
+                sv_tr = abs(np.array(shap_values_tr)).mean(
+                    axis=3)
         else:
             indexer = np.argmax(model.predict(X), axis=1)
             sv_tr = []
             for i in range(0, len(X)):
-                sv_tr.append([shap_values_tr[indexer[i]][i, :]])
+                if isinstance(shap_values_tr,list):
+                    sv_tr.append([shap_values_tr[indexer[i]][i, :]])
+                else:
+                    sv_tr.append([shap_values_tr[i, :,:,indexer[i]]])
             sv_tr = np.concatenate(sv_tr)
         return background_data,sv_tr
 
@@ -128,3 +135,21 @@ def calculate_trends(series_of_arrays):
             trends.append(np.nan)
 
     return trends
+
+
+def cdist_kshape(X, centers):
+    def cross_correlation_distance(ts1, ts2):
+        ts1_mean = np.mean(ts1)
+        ts2_mean = np.mean(ts2)
+        ts1_std = np.std(ts1)
+        ts2_std = np.std(ts2)
+        normalized_ts1 = (ts1 - ts1_mean) / ts1_std
+        normalized_ts2 = (ts2 - ts2_mean) / ts2_std
+        correlation = np.correlate(normalized_ts1, normalized_ts2, mode='valid')[0]
+        return 1 - correlation
+
+    distances = np.zeros((X.shape[0], centers.shape[0]))
+    for i, ts in enumerate(X):
+        for j, center in enumerate(centers):
+            distances[i, j] = cross_correlation_distance(ts[:, 0], center[:, 0])
+    return distances

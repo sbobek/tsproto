@@ -48,10 +48,8 @@ def plot_and_save_barplot(target, filename, figsize=(4, 2)):
     fig.savefig(filename, format='png', bbox_inches='tight')
     plt.close(fig)
 
-def plot_barycenter_with_histogram(X_train, X_train_sigids, X_train_shap, cluster_labels, cluster_centers,
-                                   target_column=None, threshold=None,
-                                   cluster_index=0, stat_function='max', human_friendly_name=None, ax=None,
-                                   sampling_rate=1, figsize=(6, 3)):
+def plot_barycenter_with_histogram(X_train, X_train_sigids, X_train_shap, X_train_init, X_train_shap_init, Xordidx, cluster_labels, cluster_centers, target_column=None, threshold=None,
+                                   cluster_index=0, stat_function='max', human_friendly_name=None, ax=None, sampling_rate=1, figsize=(6, 3)):
     """
     Plots the barycenter of time series along with histograms of specified statistics in the specified cluster.
     If target_column is None, the function plots the histogram for the entire cluster statistics.
@@ -65,11 +63,8 @@ def plot_barycenter_with_histogram(X_train, X_train_sigids, X_train_shap, cluste
     - stat_function: Statistic function for histogram ('max', 'min', 'std', 'mean', 'duration'). Default is 'max'.
     """
     # Extract the barycenter
-    barycenter = cluster_centers[cluster_index]
-    X_train_full = X_train.copy()
-    # TODO: in fact if tarrget_column[cl=ci] contains only one class, we should change the stat_function to exists
-    # if len(np.unique(target_column[cluster_labels == cluster_index])) < 2:
-    #    stat_function='exists'
+    if cluster_centers is not None:
+        barycenter = cluster_centers[cluster_index]
 
     # Extract values in the specified cluster based on the chosen statistic
     if stat_function == 'max':
@@ -83,12 +78,12 @@ def plot_barycenter_with_histogram(X_train, X_train_sigids, X_train_shap, cluste
     elif stat_function == 'std':
         cluster_values = np.nanstd(X_train[cluster_labels == cluster_index], axis=1)
         stat_name = "Standard Deviation"
-    elif stat_function == 'trend':  #
-        cluster_values = np.nanmean(X_train[cluster_labels == cluster_index], axis=1)
-        stat_name = "Trend"
     elif stat_function == 'mean':
         cluster_values = np.nanmean(X_train[cluster_labels == cluster_index], axis=1)
         stat_name = "Mean"
+    elif stat_function == 'trend':  # FX3
+        cluster_values = np.nanmean(X_train[cluster_labels == cluster_index], axis=1)
+        stat_name = "Trend"
     elif stat_function == 'duration':
         cluster_values = X_train[cluster_labels == cluster_index].shape[1] - np.sum(
             np.isnan(X_train[cluster_labels == cluster_index]), axis=1)
@@ -100,28 +95,30 @@ def plot_barycenter_with_histogram(X_train, X_train_sigids, X_train_shap, cluste
     elif stat_function == 'exists':
         cluster_values = None
         stat_name = "Number of occurence"
-    elif stat_function == 'strartpoint':
+    elif stat_function == 'distance':  # FX6
+        cluster_values = None
+        stat_name = "Similarity"
+    elif stat_function == 'startpoint':  # FX2
         cdata = X_train[cluster_labels == cluster_index]
         cluster_values = np.nanmin(X_train[cluster_labels == cluster_index], axis=1)
-        stat_name = 'startpoint'
+        stat_name = 'Startpoint'
     else:
         raise ValueError(
-            "Invalid stat_function. Choose from 'max', 'min', 'std', 'mean', 'duration' or startpoint.")
+            "Invalid stat_function. Choose from 'max', 'min', 'std', 'mean', 'trend', 'duration', 'frequency', 'exists', 'distance', or 'startpoint'.")  # FX6
 
     Xdf = pd.DataFrame(cluster_values, columns=['cluster_values'])
     Xdf['sigid'] = X_train_sigids[cluster_labels == cluster_index]
 
-    # nXdf = pd.DataFrame( X_train_sigids[~np.isin(X_train_sigids,Xdf['sigid'].values)], columns=['sigid'])
 
     Xdf['target'] = target_column[cluster_labels == cluster_index]
-    if stat_function != 'exists':
+    if stat_function not in ['exists', 'distance']:
         Xdfgr = Xdf.groupby('sigid')
         if stat_function in ['min', 'startpoint']:
-            cluster_values = Xdfgr['cluster_values'].min().values
+            cluster_values = Xdfgr['cluster_values'].min().values  # FX4
         elif stat_function == 'max':
-            cluster_values = Xdfgr['cluster_values'].max().values
+            cluster_values = Xdfgr['cluster_values'].max().values  # FX4
         else:
-            cluster_values = Xdfgr['cluster_values'].mean().values
+            cluster_values = Xdfgr['cluster_values'].mean().values  # FX4
         target_column = Xdfgr['target'].first().values
         X_train = X_train[cluster_labels == cluster_index]
     else:
@@ -133,64 +130,72 @@ def plot_barycenter_with_histogram(X_train, X_train_sigids, X_train_shap, cluste
         fig, ax = plt.subplots(2, 1, figsize=figsize)
 
     ##No matter what, we want to plot exaples of time series with prototype in consideration
-    sample_mask = X_train_sigids == Xdf['sigid'].iloc[0]
-    full_sample_a = X_train_full[sample_mask]
+    if len(Xdf) == 0:
+        return
+    # here we can get the init shap and init x and ordix and plot it correctly
+
+    # select sigid that have the average shap of a
+
+    ccshap = np.vstack((np.nanmean(X_train_shap, axis=1)[:, 0], X_train_sigids))[:, cluster_labels == cluster_index]
+    maxshap = np.argmax(ccshap[0, :])
+    sigid = ccshap[1, maxshap]
+
+    sample_mask = X_train_sigids == sigid
     cluster_part = np.where(cluster_labels[sample_mask] == cluster_index)[0]
-    full_sample = np.concatenate(full_sample_a)
-    full_sample = full_sample[~np.isnan(full_sample)]
-    ax[0].plot(full_sample, "black", alpha=0.5)
-    print(cluster_labels[sample_mask])
 
     start_point = 0
-    prev_color = None
     # Plot each array one after another
+    full_sample_a = X_train_init[int(sigid)]
+    full_sample = np.concatenate(X_train_init[int(sigid)])
+    ordix = Xordidx[int(sigid)]
+    ci = 0
+    alpha_prev = 0.5
     for i, array in enumerate(full_sample_a):
         # Calculate x-axis values for the current array
         array = array[~np.isnan(array)]
         x_values = np.arange(start_point, start_point + len(array))
-        ax[0].axvline(x=start_point, color='r', linestyle='--')
+        ax[0].axvline(x=start_point, color='r', linestyle='--')  # FX3
 
-        # Plot the array with the specified color
-        if i in cluster_part:
-            ax[0].plot(x_values, array, label=f'Array {i + 1}', color='red')
-            prev_color = 'red'
+        if i in ordix:
+            # Plot the array with the specified color
+            if ci in cluster_part:
+                ax[0].plot(x_values, array, label=f'Array {i + 1}', color='red')
+                prev_color = 'red'
+                alpha_prev = 1
+            else:
+                ax[0].plot(x_values, array, label=f'Array {i + 1}', color='green')
+                prev_color = 'green'
+                alpha_prev = 1
+            ci += 1
         else:
-            prev_color = None
+            ax[0].plot(x_values, array, label=f'Array {i + 1}', color='black', alpha=0.5)
+            prev_color = 'black'
+            alpha_prev = 0.5
 
         # Update the starting point for the next array
         start_point = start_point + len(array)
 
-        # print([x_values[-1], start_point])
-        # print([array[-1], full_sample_a[i + 1].ravel()[0]])
         if i < len(full_sample_a) - 1 and prev_color is not None:
-            ax[0].plot([x_values[-1], start_point], [array[-1], full_sample_a[i + 1].ravel()[0]], color=prev_color)
+            ax[0].plot([x_values[-1], start_point], [array[-1], full_sample_a[i + 1].ravel()[0]], color=prev_color,
+                       alpha=alpha_prev)
 
-    print(
-        f'Shapes: {X_train_full.shape} vs shap: {X_train_shap[sample_mask].shape} TODO: take IDS of a single sample that is plotted')
-    shap_sample = np.concatenate(X_train_shap[sample_mask])
+    shap_sample = np.concatenate(X_train_shap_init[int(sigid)])
     reference_value_sampe = np.concatenate(full_sample_a)
     shap_sample = shap_sample[~np.isnan(reference_value_sampe)]
     ax[0].imshow([shap_sample], cmap='viridis', aspect='auto',
                  extent=[0, len(shap_sample), min(reference_value_sampe.ravel()), max(reference_value_sampe.ravel())],
                  alpha=0.3)
 
+    # Contrastive examples (the one that does not have that cluster)
+
 
     if target_column is not None:
-        # Plot individual time series and barycenter
-        for series, class_label in zip(X_train, target_column):
-            ax[1].plot(series.ravel(), "k-", alpha=0.7, color=plt.cm.Set2(class_label))
-
-        selected_indices = np.random.choice(X_train_full[cluster_labels != cluster_index].shape[0],
-                                            min(100, X_train_full[cluster_labels != cluster_index].shape[0]),
-                                            replace=False)
-        for si in selected_indices:
-            ax[1].plot(X_train_full[cluster_labels != cluster_index][si, :].ravel(), "k-", alpha=0.05)
-
-        ax[1].plot(barycenter.ravel(), "r-", linewidth=2)
+        if cluster_centers is not None:
+            ax[1].plot(barycenter.ravel(), "r-", linewidth=2)
         ax[1].set_title(f"{stat_name} of cluster {cluster_index} of feature {human_friendly_name}")
         ax[1].legend()
 
-        if stat_function != 'exists':
+        if stat_function not in ['exists', 'distance']:  # FX6
             # Create an inset axis for the histogram
             divider = make_axes_locatable(ax[1])
             cax = divider.append_axes("bottom", size="20%", pad=0.1)
@@ -214,14 +219,13 @@ def plot_barycenter_with_histogram(X_train, X_train_sigids, X_train_shap, cluste
 
     else:
         # If target_column is None, plot the individual time series on the barycenter plot without coloring
-        for series in X_train:
-            ax[1].plot(series.ravel(), "k-", alpha=0.7)
-        ax[1].plot(barycenter.ravel(), "r-", linewidth=2,
-                   label=f"Barycenter (Cluster {cluster_index} of feature {human_friendly_name})")
-        ax[1].set_title(f"Barycenter of Time Series (Cluster {cluster_index} of feature {human_friendly_name})")
-        ax[1].legend()
+        if cluster_centers is not None:
+            ax[1].plot(barycenter.ravel(), "r-", linewidth=2,
+                       label=f"Barycenter (Cluster {cluster_index} of feature {human_friendly_name})")
+            ax[1].set_title(f"Barycenter of Time Series (Cluster {cluster_index} of feature {human_friendly_name})")
+            ax[1].legend()
 
-        if stat_function != 'exists':
+        if stat_function not in ['exists', 'distance']:  # FX6
             # Create an inset axis for the histogram
             divider = make_axes_locatable(ax[1])
             cax = divider.append_axes("bottom", size="20%", pad=0.1)
@@ -233,7 +237,6 @@ def plot_barycenter_with_histogram(X_train, X_train_sigids, X_train_shap, cluste
             # cax.set_title(f"Histogram of {stat_name} Values (Cluster {cluster_index} of feature {human_friendly_name})")
             cax.set_xlabel(stat_name)
             cax.set_ylabel("Frequency")
-
 
 
 
@@ -260,17 +263,18 @@ def plot_histogram(ax, dataset, xbis, xbis_shap, xbisclusters, xbisindices, feat
     signaldf = pd.DataFrame(xbisindices[human_friendly_name], columns=['sigid']).set_index('sigid')
     target_values = signaldf.join(dataset[[target_name]], how='right').dropna().values
 
-    # print(f'cbis shape:{xbis[human_friendly_name].shape}')
-    # print(f'target shap  = {target_values.shape}')
-    # print(f'xbisclusters shape = {xbisclusters[human_friendly_name].shape}')
-    plot_barycenter_with_histogram(X_train=xbis[human_friendly_name], X_train_sigids=xbisindices[human_friendly_name],
+    plot_barycenter_with_histogram(X_train=xbis[human_friendly_name],
+                                   X_train_sigids=xbisindices[human_friendly_name],
                                    cluster_labels=xbisclusters[human_friendly_name],
                                    X_train_shap=xbis_shap[human_friendly_name],
-                                   cluster_centers=cluster_centers, target_column=target_values,
-                                   # target has to be populated over sigid
-                                   cluster_index=int(cluster_index), stat_function=stat_function, ax=ax,
-                                   human_friendly_name=human_friendly_name,
-                                   sampling_rate=proto_encoder.sampling_rate, threshold=threshold)
+                                   X_train_init=proto_encoder.xbis_init_[human_friendly_name],
+                                   X_train_shap_init=proto_encoder.xbis_shap_init_[human_friendly_name],
+                                   Xordidx=proto_encoder.xbis_ordidx_[human_friendly_name],
+                                   cluster_centers=cluster_centers,
+                                   target_column=target_values,  # target has to be populated over sigid
+                                   cluster_index=int(cluster_index),
+                                   stat_function=stat_function, ax=ax, human_friendly_name=human_friendly_name,
+                                   sampling_rate=proto_encoder.sampling_rate_, threshold=threshold)
 
     # ax.legend()
 
@@ -307,18 +311,8 @@ def get_node_histogram_svg_filenames(decision_tree, node, dataset, xbis, xbis_sh
     Returns:
     - Tuple (left_histogram_filename, right_histogram_filename)
     """
-    # feature_name = feature_names[decision_tree.tree_.feature[node]]
-    # left_data = decision_tree.tree_.value[decision_tree.tree_.children_left[node]].ravel()
-    # right_data = decision_tree.tree_.value[decision_tree.tree_.children_right[node]].ravel()
-
-    # left_svg_filename = os.path.join(output_dir, f'left_{node}.svg')
-    # right_svg_filename = os.path.join(output_dir, f'right_{node}.svg')
-
-    # save_histogram_svg(left_data, f'{feature_name} <= {decision_tree.tree_.threshold[node]:.2f}', left_svg_filename)
-    # save_histogram_svg(right_data, f'{feature_name} > {decision_tree.tree_.threshold[node]:.2f}', right_svg_filename)
     feature_name = feature_names[decision_tree.tree_.feature[node]]
 
-    # TODO: this should simply contain summary of classes
     svg_filename = os.path.join(output_dir, f'{node}.png')
 
     if decision_tree.tree_.children_left[node] != decision_tree.tree_.children_right[node]:
@@ -341,8 +335,6 @@ def get_node_histogram_svg_filenames(decision_tree, node, dataset, xbis, xbis_sh
             indices = np.where(np.isin(xbisindices[k], list(ds.index)))[0]
             new_xbis[k] = xbis[k][indices]
         return new_xbis
-
-    # print(f' feature name {feature_name}, left: {decision_tree.tree_.children_left[node]} right {decision_tree.tree_.children_right[node]}')
 
     if decision_tree.tree_.children_left[node] != -1:
         leftds = dataset.query(left_cond)
@@ -437,13 +429,6 @@ def export_decision_tree_with_embedded_histograms(decision_tree, dataset, target
     #    print(f"Error exporting Decision Tree to DOT file with embedded histograms: {e}")
     return None
 
-# Example usage:
-# Assuming you have a DecisionTreeClassifier object named 'dt_classifier'
-# feature_names is the list of feature names, and you want to save the DOT file as 'decision_tree'
-# export_decision_tree_with_embedded_histograms(dt_classifier, feature_names, 'decision_tree')
-
-
-
 
 def display_breakpoints(
         signal,
@@ -488,12 +473,6 @@ def display_breakpoints(
         signal = signal.reshape(-1, 1)
     n_samples, n_features = signal.shape
 
-    # let's set a sensible defaut size for the subplots
-    # matplotlib_options = {
-    #    "figsize": (10, 2 * n_features),  # figure size
-    # }
-    # add/update the options given by the user
-    # matplotlib_options.update(kwargs)
 
     # create plots
     if ax is None:
@@ -551,7 +530,6 @@ def plot_smooth_colored_line(x_values, y_values, color_values, resolution=1000, 
         fig, ax = plt.subplots()
     ax.add_collection(lc)
     ax.autoscale()
-    #ax.set_xlim(0, len(x_values) - 1)
 
     # Add colorbar
     if add_cbar:

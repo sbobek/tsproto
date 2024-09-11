@@ -1,9 +1,12 @@
 Release notes
 =============
 
-0.2.1 (2024-05-06)
+0.3.0 (2024-09-11)
 -------------
-* Added changepoint_sensitivity instead of pen parameter. NOw, the pen parameter is estimated automatically
+* Added several new clustering models
+* Improved visualizations (added SHAP heatmap)
+* Bugfix with different versions of SHAP inconsistently returning list or 3D numpy array in getshap function
+* Added changepoint_sensitivity instead of pen parameter. Now, the pen parameter is estimated automatically
 * Added support for ROCKET-based clustering with sktime 0.29.0
 * Bugfix with incorrect visualization reported in #9
 * Bugfix with internal data not updating after transform (this is needed for the visualization)
