@@ -90,6 +90,11 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
         self.cluster_override_factor = {}
         self.global_breakpointing = global_breakpointing
 
+        if self.method == 'sbc' and not self.global_breakpointing:
+            warnings.warn(
+                "Overriding parameter global_breakpointing to True, as sbc method cannot work with local breakpoints.")
+            self.global_breakpointing = True
+
         if self.method == 'kshapegpu':
             try:
                 from kshape.core_gpu import KShapeClusteringGPU
@@ -206,7 +211,7 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
                     self.thresholds_[dim] = 0
 
             # ante-hoc filtering
-            if self.thresholds_[dim] > 0:
+            if self.thresholds_[dim] > 0 and self.method != 'sbc':
                 indexed_slices = [[i, s, ss, bp, bbp, o] for ts, tss, ti, bpi, bbpi, oi in
                                   zip(totalslice, totalsslice, indexes, totalbpoints, bbox_preds, ordidx) for
                                   s, ss, i, bp, bbp, o in zip(ts, tss, ti, bpi, bbpi, oi) if
@@ -237,9 +242,16 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
                 totalbpoints = list(isdf.groupby(0)[3].apply(np.array))
                 bbox_preds = list(isdf.groupby(0)[4].apply(np.array))
                 ordidx = list(isdf.groupby(0)[5].apply(np.array))
+            elif not refit and self.thresholds_[dim] > 0 and self.method == 'sbc':
+                # simply silence down  slices that are not in ordix
+                indexes = [[sublist[i] for i in self.kms_[dim].ordidx] for sublist in indexes]
+                totalslice = [[sublist[i] for i in self.kms_[dim].ordidx] for sublist in totalslice]
+                totalsslice = [[sublist[i] for i in self.kms_[dim].ordidx] for sublist in totalsslice]
+                totalbpoints = [[sublist[i] for i in self.kms_[dim].ordidx] for sublist in totalbpoints]
+                bbox_preds = [[sublist[i] for i in self.kms_[dim].ordidx] for sublist in bbox_preds]
 
 
-            ############# post-hoc filtering
+                ############# post-hoc filtering
             totalslice = [item for sublist in totalslice for item in sublist]
             totalsslice = [item for sublist in totalsslice for item in
                            sublist]  # this can be treated as weights in samples
@@ -347,10 +359,6 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
                     self.kms_[dim].cluster_centers_ = self.kms_[dim].centroids_
                 if self.method == 'kshapegpu':
                     self.kms_[dim].cluster_centers_ = self.kms_[dim].centroids_.detach().cpu()
-                if self.method == 'sbc':
-                    self.kms_[dim].labels_ = np.concatenate(ordidx)  # np.arange(0,self.temp_bpoint)
-                    self.kms_[dim].cluster_centers_ = np.zeros(
-                        (np.max(self.kms_[dim].labels_) + 1, X_bis.shape[1], 1))
 
             self.xbis_cluster_labels_[self.feature_names[dim]] = self.kms_[dim].labels_  # FX2
             self.xbis_ordidx_[self.feature_names[dim]] = ordidx
@@ -370,10 +378,7 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
                 self.label_features_[dim] = np.arange(0, np.max(labels) + 1)
                 self.signal_ids_[self.feature_names[dim]] = np.concatenate(indexes)
             else:
-                if self.method == 'sbc':
-                    labels = np.concatenate(ordidx)
-                else:
-                    labels = self.kms_[dim].predict(X_bis)
+                labels = self.kms_[dim].predict(X_bis)
 
                 self.xbis_cluster_labels_[self.feature_names[dim]] = labels  # FX2
                 self.signal_ids_[self.feature_names[dim]] = np.concatenate(indexes)  # FX2
@@ -444,18 +449,18 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
                                        aggfunc=lambda x: sum(~np.isnan(x))).fillna(0).astype(int)
 
             startpoint_train = pd.pivot_table(Xdfp, index='sigid', columns='cluster', values='startpoint',
-                                              aggfunc='min')
+                                              aggfunc='min').fillna(0)
             duration_train = pd.pivot_table(Xdfp, index='sigid', values='durations',
-                                            columns='cluster')
+                                            columns='cluster').fillna(0)
             min_train = pd.pivot_table(Xdfp, index='sigid', values='min', columns='cluster',
-                                       aggfunc='min')
+                                       aggfunc='min').fillna(min_float32)
             max_train = pd.pivot_table(Xdfp, index='sigid', values='max', columns='cluster',
-                                       aggfunc='max')
-            mean_train = pd.pivot_table(Xdfp, index='sigid', values='mean', columns='cluster')
-            std_train = pd.pivot_table(Xdfp, index='sigid', values='std', columns='cluster')
-            trend_train = pd.pivot_table(Xdfp, index='sigid', values='trend', columns='cluster')
+                                       aggfunc='max').fillna(max_float32)
+            mean_train = pd.pivot_table(Xdfp, index='sigid', values='mean', columns='cluster').fillna(0)
+            std_train = pd.pivot_table(Xdfp, index='sigid', values='std', columns='cluster').fillna(0)
+            trend_train = pd.pivot_table(Xdfp, index='sigid', values='trend', columns='cluster').fillna(0)
             frequency_train = pd.pivot_table(Xdfp, index='sigid', values='frequency',
-                                             columns='cluster')  # .fillna(0)
+                                             columns='cluster').fillna(0)
             self.weights_[dim] = Xdf.groupby('sigid')['shapweight'].apply(self.importance_aggregation_func).values
 
 
@@ -523,18 +528,20 @@ def pad_arrays_in_dict(array_dict):
 
 class SequentialBreakpointClustering(BaseEstimator, TransformerMixin):
     def __init__(self, ordidx):
-        self.ordidx = ordidx
+        self.ordidx = np.sort(np.unique(ordidx))
 
     def fit(self, X, y=None):
-        self.labels_ = np.concatenate(self.ordidx)  # np.arange(0,self.temp_bpoint)
-        self.cluster_centers_ = np.zeros((np.max(self.labels_) + 1, X.shape[1], 1))
+        self.labels_ = np.tile(self.ordidx, int(len(X) / len(
+            self.ordidx)))
+        self.cluster_centers_ = np.array([X[self.labels_ == i].mean(axis=0) for i in range(np.max(self.labels_) + 1)
+                                          ]).reshape(-1, X.shape[1], 1)
         return self
 
     def predict(self, X):
         if self.labels_ is None:
             raise ValueError("The model has not been fitted yet.")
 
-        return self.labels_
+        return np.tile(self.ordidx, int(len(X) / len(self.ordidx)))
 
 class RocketMedoids:
 
@@ -545,7 +552,8 @@ class RocketMedoids:
         self.scaler = StandardScaler()
     def fit(self,X,y=None):
         X = X.reshape(X.shape[0],1,X.shape[1])
-        Xr =self.rocket.fit_transform(X,y).fillna(0)
+        Xr = self.rocket.fit_transform(X, y)
+        Xr = Xr.replace([np.inf, -np.inf], np.nan).fillna(0)
         Xr=self.scaler.fit_transform(Xr)
         Xrd = self.pca.fit_transform(Xr)
         self.kmedoids.fit(Xrd)

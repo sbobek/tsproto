@@ -1,6 +1,14 @@
 Release notes
 =============
 
+0.3.1 (2024-12-27)
+-------------
+* Fixed issue with incorrect contrastive eample plotting when plotted pattern is only in focus class
+* Overriding global_breakpointing parameter, when sbc method is set
+* Bugfix in incorrect number of cluster assignment when sbc method is set
+* Contrastive plots added
+* Bugfix in incorrect barycenters in SBC method
+
 0.3.0 (2024-09-11)
 -------------
 * Added several new clustering models

@@ -48,8 +48,11 @@ def plot_and_save_barplot(target, filename, figsize=(4, 2)):
     fig.savefig(filename, format='png', bbox_inches='tight')
     plt.close(fig)
 
-def plot_barycenter_with_histogram(X_train, X_train_sigids, X_train_shap, X_train_init, X_train_shap_init, Xordidx, cluster_labels, cluster_centers, target_column=None, threshold=None,
-                                   cluster_index=0, stat_function='max', human_friendly_name=None, ax=None, sampling_rate=1, figsize=(6, 3)):
+
+def plot_barycenter_with_histogram(X_train, X_train_sigids, X_train_shap, X_train_init, X_train_shap_init, Xordidx,
+                                   cluster_labels, cluster_centers, target_column=None, threshold=None, cluster_index=0,
+                                   stat_function='max', human_friendly_name=None, ax=None, sampling_rate=1,
+                                   focus_class=None, figsize=(6, 3)):
     """
     Plots the barycenter of time series along with histograms of specified statistics in the specified cluster.
     If target_column is None, the function plots the histogram for the entire cluster statistics.
@@ -65,6 +68,8 @@ def plot_barycenter_with_histogram(X_train, X_train_sigids, X_train_shap, X_trai
     # Extract the barycenter
     if cluster_centers is not None:
         barycenter = cluster_centers[cluster_index]
+
+    X_train_full = X_train.copy()
 
     # Extract values in the specified cluster based on the chosen statistic
     if stat_function == 'max':
@@ -108,7 +113,7 @@ def plot_barycenter_with_histogram(X_train, X_train_sigids, X_train_shap, X_trai
 
     Xdf = pd.DataFrame(cluster_values, columns=['cluster_values'])
     Xdf['sigid'] = X_train_sigids[cluster_labels == cluster_index]
-
+    target_column_orig = target_column
 
     Xdf['target'] = target_column[cluster_labels == cluster_index]
     if stat_function not in ['exists', 'distance']:
@@ -119,83 +124,118 @@ def plot_barycenter_with_histogram(X_train, X_train_sigids, X_train_shap, X_trai
             cluster_values = Xdfgr['cluster_values'].max().values  # FX4
         else:
             cluster_values = Xdfgr['cluster_values'].mean().values  # FX4
+        target_column_shap = target_column[cluster_labels == cluster_index]
         target_column = Xdfgr['target'].first().values
-        X_train = X_train[cluster_labels == cluster_index]
     else:
-        X_train = X_train[cluster_labels == cluster_index]
-        target_column = target_column[cluster_labels == cluster_index]
+        target_column_shap = target_column = target_column[cluster_labels == cluster_index]
 
     # Create the main figure and axis
     if ax is None:
-        fig, ax = plt.subplots(2, 1, figsize=figsize)
+        fig, ax = plt.subplots(3 if focus_class is not None else 2, 1, figsize=figsize, sharey=True)
 
     ##No matter what, we want to plot exaples of time series with prototype in consideration
     if len(Xdf) == 0:
         return
     # here we can get the init shap and init x and ordix and plot it correctly
 
-    # select sigid that have the average shap of a
 
-    ccshap = np.vstack((np.nanmean(X_train_shap, axis=1)[:, 0], X_train_sigids))[:, cluster_labels == cluster_index]
+    ccshap_full_cf=ccshap_full = np.vstack((np.nanmean(X_train_shap, axis=1)[:, 0], X_train_sigids))[:,
+                  cluster_labels == cluster_index]
+    print(f'TC: {len(target_column)} over ccshap: {ccshap_full.shape[1]}')
+
+    focus_valid = False
+    focus_valid_cf = False
+    class_mask_cf = class_mask = [True] * ccshap_full.shape[1]
+    if focus_class is not None:
+        class_mask_candidate = (target_column_shap == focus_class)
+        class_mask_cf_candidate = (target_column_shap != focus_class)
+        print(f'Number of clusters in opposite_class: {sum(class_mask_cf_candidate)} as opposed ot actual class {sum(class_mask_candidate)}')
+        if sum(class_mask_candidate) > 0:
+            class_mask = class_mask_candidate.ravel()
+            focus_valid = True
+        if sum(class_mask_cf_candidate) > 0:
+            class_mask_cf = class_mask_cf_candidate.ravel()
+            focus_valid_cf = True
+        else:
+            # if there is no example hyaving the same clauster (proximity maximal), pick one form different cluster
+            ccshap_full_cf = np.vstack((np.nanmean(X_train_shap, axis=1)[:, 0], X_train_sigids)) #take all samples, and later pick other class
+            class_mask_cf = [True] * ccshap_full_cf.shape[1]
+            class_mask_cf_candidate = (target_column_orig != focus_class)
+            print(f'Found: {sum(class_mask_cf_candidate)}')
+            if sum(class_mask_cf_candidate) > 0:
+                class_mask_cf = class_mask_cf_candidate.ravel()
+                focus_valid_cf = True
+
+    ccshap = ccshap_full[:, class_mask]
     maxshap = np.argmax(ccshap[0, :])
     sigid = ccshap[1, maxshap]
 
-    sample_mask = X_train_sigids == sigid
-    cluster_part = np.where(cluster_labels[sample_mask] == cluster_index)[0]
+    ccshap = ccshap_full_cf[:, class_mask_cf]
+    maxshap = np.argmin(ccshap[0, :])
+    sigid_cf = ccshap[1, maxshap]
 
-    start_point = 0
-    # Plot each array one after another
-    full_sample_a = X_train_init[int(sigid)]
-    full_sample = np.concatenate(X_train_init[int(sigid)])
-    ordix = Xordidx[int(sigid)]
-    ci = 0
-    alpha_prev = 0.5
-    for i, array in enumerate(full_sample_a):
-        # Calculate x-axis values for the current array
-        array = array[~np.isnan(array)]
-        x_values = np.arange(start_point, start_point + len(array))
-        ax[0].axvline(x=start_point, color='r', linestyle='--')  # FX3
+    def plot_representative(sigid, ax, colormark):
+        start_point = 0
+        # Plot each array one after another
+        sample_mask = X_train_sigids == sigid
+        cluster_part = np.where(cluster_labels[sample_mask] == cluster_index)[0]
+        full_sample_a = X_train_init[int(sigid)]
+        ordix = Xordidx[int(sigid)]
+        ci = 0
+        for i, array in enumerate(full_sample_a):
+            # Calculate x-axis values for the current array
+            array = array[~np.isnan(array)]
+            x_values = np.arange(start_point, start_point + len(array))
+            ax.axvline(x=start_point, color='r', linestyle='--')  # FX3
 
-        if i in ordix:
-            # Plot the array with the specified color
-            if ci in cluster_part:
-                ax[0].plot(x_values, array, label=f'Array {i + 1}', color='red')
-                prev_color = 'red'
-                alpha_prev = 1
+            if i in ordix:
+                # Plot the array with the specified color
+                if ci in cluster_part:
+                    ax.plot(x_values, array, label=f'Array {i + 1}', color='red')
+                    prev_color = 'red'
+                    alpha_prev = 1
+                else:
+                    ax.plot(x_values, array, label=f'Array {i + 1}', color='green')
+                    prev_color = 'green'
+                    alpha_prev = 1
+                ci += 1
             else:
-                ax[0].plot(x_values, array, label=f'Array {i + 1}', color='green')
-                prev_color = 'green'
-                alpha_prev = 1
-            ci += 1
-        else:
-            ax[0].plot(x_values, array, label=f'Array {i + 1}', color='black', alpha=0.5)
-            prev_color = 'black'
-            alpha_prev = 0.5
+                ax.plot(x_values, array, label=f'Array {i + 1}', color='black', alpha=0.5)
+                prev_color = 'black'
+                alpha_prev = 0.5
 
-        # Update the starting point for the next array
-        start_point = start_point + len(array)
+            # Update the starting point for the next array
+            start_point = start_point + len(array)
 
-        if i < len(full_sample_a) - 1 and prev_color is not None:
-            ax[0].plot([x_values[-1], start_point], [array[-1], full_sample_a[i + 1].ravel()[0]], color=prev_color,
-                       alpha=alpha_prev)
+            if i < len(full_sample_a) - 1 and prev_color is not None:
+                ax.plot([x_values[-1], start_point], [array[-1], full_sample_a[i + 1].ravel()[0]], color=prev_color,
+                        alpha=alpha_prev)
 
-    shap_sample = np.concatenate(X_train_shap_init[int(sigid)])
-    reference_value_sampe = np.concatenate(full_sample_a)
-    shap_sample = shap_sample[~np.isnan(reference_value_sampe)]
-    ax[0].imshow([shap_sample], cmap='viridis', aspect='auto',
-                 extent=[0, len(shap_sample), min(reference_value_sampe.ravel()), max(reference_value_sampe.ravel())],
-                 alpha=0.3)
+        shap_sample = np.concatenate(X_train_shap_init[int(sigid)])
+        reference_value_sampe = np.concatenate(full_sample_a)
+        shap_sample = shap_sample[~np.isnan(reference_value_sampe)]
+        ax.imshow([shap_sample], cmap='viridis', aspect='auto',
+                  extent=[0, len(shap_sample), min(reference_value_sampe.ravel()), max(reference_value_sampe.ravel())],
+                  alpha=0.3)
 
-    # Contrastive examples (the one that does not have that cluster)
+        if focus_valid:
+            xlim = ax.get_xlim()
+            ylim = ax.get_ylim()
+            # Add a larger red dot in the bottom right corner
+            ax.scatter(xlim[1], ylim[0], color=colormark, s=100)
 
+    plot_representative(sigid, ax[0], 'red')
+    if focus_valid_cf:
+        plot_representative(sigid_cf, ax[1], 'green')
 
     if target_column is not None:
-        if cluster_centers is not None:
-            ax[1].plot(barycenter.ravel(), "r-", linewidth=2)
-        ax[1].set_title(f"{stat_name} of cluster {cluster_index} of feature {human_friendly_name}")
-        ax[1].legend()
 
-        if stat_function not in ['exists', 'distance']:  # FX6
+        if cluster_centers is not None:
+            ax[-1].plot(barycenter.ravel(), "r-", linewidth=2)
+        ax[-1].set_title(f"{stat_name} of pattern {cluster_index} of feature/dimension {human_friendly_name} in TS")
+        ax[-1].legend()
+
+        if stat_function not in ['exists', 'distance'] and False:  # FX6
             # Create an inset axis for the histogram
             divider = make_axes_locatable(ax[1])
             cax = divider.append_axes("bottom", size="20%", pad=0.1)
@@ -212,18 +252,17 @@ def plot_barycenter_with_histogram(X_train, X_train_sigids, X_train_shap, X_trai
 
             if threshold is not None:
                 cax.axvline(threshold, linestyle='--', color='r')
-            # cax.set_title(f"Histograms of {stat_name} Values (Cluster {cluster_index} of feature {human_friendly_name} )")
+
             cax.set_xlabel(stat_name)
             cax.set_ylabel("Frequency")
             cax.legend(loc='upper right')
 
     else:
-        # If target_column is None, plot the individual time series on the barycenter plot without coloring
         if cluster_centers is not None:
-            ax[1].plot(barycenter.ravel(), "r-", linewidth=2,
-                       label=f"Barycenter (Cluster {cluster_index} of feature {human_friendly_name})")
-            ax[1].set_title(f"Barycenter of Time Series (Cluster {cluster_index} of feature {human_friendly_name})")
-            ax[1].legend()
+            ax[-1].plot(barycenter.ravel(), "r-", linewidth=2,
+                       label=f"Barycenter (Pattern {cluster_index} of feature {human_friendly_name})")
+            ax[-1].set_title(f"Barycenter of Time Series (Pattern {cluster_index} of feature {human_friendly_name})")
+            ax[-1].legend()
 
         if stat_function not in ['exists', 'distance']:  # FX6
             # Create an inset axis for the histogram
@@ -239,12 +278,8 @@ def plot_barycenter_with_histogram(X_train, X_train_sigids, X_train_shap, X_trai
             cax.set_ylabel("Frequency")
 
 
-
-
-
-
 def plot_histogram(ax, dataset, xbis, xbis_shap, xbisclusters, xbisindices, feature_name, target_name, threshold=None,
-                   proto_encoder=None):
+                   proto_encoder=None, focus_class=None):
     """
     Plot a histogram colored by the values of the target.
 
@@ -258,7 +293,8 @@ def plot_histogram(ax, dataset, xbis, xbis_shap, xbisclusters, xbisindices, feat
     (stat_function, _, cluster_index, human_friendly_name) = feature_name.split('_', 3)
 
     all_features = [f for f in dataset.columns if f not in [target_name]]
-    cluster_centers = proto_encoder.kms_[proto_encoder.feature_names.index(human_friendly_name)].cluster_centers_
+    cluster_centers = proto_encoder.kms_[proto_encoder.feature_names.index(
+        human_friendly_name)].cluster_centers_  # TODO: in case of kshape adn GPUKShape this is different: centroids_ // centroids_.detach().cpu()
 
     signaldf = pd.DataFrame(xbisindices[human_friendly_name], columns=['sigid']).set_index('sigid')
     target_values = signaldf.join(dataset[[target_name]], how='right').dropna().values
@@ -267,6 +303,7 @@ def plot_histogram(ax, dataset, xbis, xbis_shap, xbisclusters, xbisindices, feat
                                    X_train_sigids=xbisindices[human_friendly_name],
                                    cluster_labels=xbisclusters[human_friendly_name],
                                    X_train_shap=xbis_shap[human_friendly_name],
+                                   ##Xinit and Xinitshap and ordix
                                    X_train_init=proto_encoder.xbis_init_[human_friendly_name],
                                    X_train_shap_init=proto_encoder.xbis_shap_init_[human_friendly_name],
                                    Xordidx=proto_encoder.xbis_ordidx_[human_friendly_name],
@@ -274,13 +311,14 @@ def plot_histogram(ax, dataset, xbis, xbis_shap, xbisclusters, xbisindices, feat
                                    target_column=target_values,  # target has to be populated over sigid
                                    cluster_index=int(cluster_index),
                                    stat_function=stat_function, ax=ax, human_friendly_name=human_friendly_name,
-                                   sampling_rate=proto_encoder.sampling_rate_, threshold=threshold)
+                                   sampling_rate=proto_encoder.sampling_rate_, threshold=threshold,
+                                   focus_class=focus_class)
 
     # ax.legend()
 
 
 def save_histogram_svg(dataset, xbis, xbis_shap, xbisclusters, xbisindices, feature_name, target_name, threshold,
-                       filename, proto_encoder=None, figsize=(6, 3)):
+                       filename, proto_encoder=None, focus_class=None, figsize=(6, 3)):
     """
     Save the histogram plot as an SVG file.
 
@@ -289,16 +327,18 @@ def save_histogram_svg(dataset, xbis, xbis_shap, xbisclusters, xbisindices, feat
     - feature_name: Name of the feature for labeling the plot
     - filename: Name of the SVG file to save
     """
-    fig, ax = plt.subplots(2, 1, figsize=figsize)
+    number_of_axis = 3 if focus_class is not None else 2
+
+    fig, ax = plt.subplots(number_of_axis, 1, sharex=True, figsize=figsize)
     plot_histogram(ax, dataset, xbis, xbis_shap, xbisclusters, xbisindices, feature_name, target_name,
-                   threshold=threshold, proto_encoder=proto_encoder)
+                   threshold=threshold, proto_encoder=proto_encoder, focus_class=focus_class)
     fig.savefig(filename, format='png', bbox_inches='tight')
     plt.close(fig)
 
 
 def get_node_histogram_svg_filenames(decision_tree, node, dataset, xbis, xbis_shap, xbisclusters, xbisindices,
-                                     target_name, feature_names, output_dir, proto_encoder=None, stat_nodes={},
-                                     figsize=(6, 3)):
+                                     target_name, feature_names, output_dir, proto_encoder=None, focus_class=None,
+                                     stat_nodes={}, figsize=(6, 3)):
     """
     Save SVG representations of histograms for a given internal node.
 
@@ -318,7 +358,7 @@ def get_node_histogram_svg_filenames(decision_tree, node, dataset, xbis, xbis_sh
     if decision_tree.tree_.children_left[node] != decision_tree.tree_.children_right[node]:
         save_histogram_svg(dataset, xbis, xbis_shap, xbisclusters, xbisindices, feature_name, target_name,
                            decision_tree.tree_.threshold[node], svg_filename, proto_encoder=proto_encoder,
-                           figsize=figsize)
+                           focus_class=focus_class, figsize=figsize)
     else:
         plot_and_save_barplot(dataset[target_name].values, svg_filename)
 
@@ -336,6 +376,8 @@ def get_node_histogram_svg_filenames(decision_tree, node, dataset, xbis, xbis_sh
             new_xbis[k] = xbis[k][indices]
         return new_xbis
 
+    # print(f' feature name {feature_name}, left: {decision_tree.tree_.children_left[node]} right {decision_tree.tree_.children_right[node]}')
+
     if decision_tree.tree_.children_left[node] != -1:
         leftds = dataset.query(left_cond)
         new_xbis = filter_xbis(xbis, xbisindices, leftds)
@@ -345,8 +387,8 @@ def get_node_histogram_svg_filenames(decision_tree, node, dataset, xbis, xbis_sh
         left_dot = get_node_histogram_svg_filenames(decision_tree, decision_tree.tree_.children_left[node],
                                                     dataset.query(left_cond), new_xbis, nex_xbisshap, new_xbisclusters,
                                                     new_xbisindices,
-                                                    target_name, feature_names, output_dir,
-                                                    proto_encoder=proto_encoder)  #
+                                                    target_name, feature_names, output_dir, proto_encoder=proto_encoder,
+                                                    focus_class=focus_class)  #
         combined += left_dot
     if decision_tree.tree_.children_right[node] != -1:
         rightds = dataset.query(right_cond)
@@ -358,14 +400,14 @@ def get_node_histogram_svg_filenames(decision_tree, node, dataset, xbis, xbis_sh
                                                      dataset.query(right_cond), new_xbis, nex_xbisshap,
                                                      new_xbisclusters, new_xbisindices,
                                                      target_name, feature_names, output_dir,
-                                                     proto_encoder=proto_encoder)  #
+                                                     proto_encoder=proto_encoder, focus_class=focus_class)  #
         combined += right_dot
 
     return combined
 
 
 def embed_histograms_in_dot(decision_tree, dataset, xbis, xbis_shap, xbisclusters, xbisindices, target_name,
-                            feature_names, output_dir, proto_encoder=None, figsize=(6, 3)):
+                            feature_names, output_dir, proto_encoder=None, focus_class=None, figsize=(6, 3)):
     """
     Embed histograms in DOT format for each internal node.
 
@@ -382,7 +424,8 @@ def embed_histograms_in_dot(decision_tree, dataset, xbis, xbis_shap, xbiscluster
 
     combined_dot = get_node_histogram_svg_filenames(decision_tree, 0, dataset, xbis, xbis_shap, xbisclusters,
                                                     xbisindices, target_name, feature_names, output_dir,
-                                                    proto_encoder=proto_encoder, figsize=figsize)
+                                                    proto_encoder=proto_encoder, focus_class=focus_class,
+                                                    figsize=figsize)
 
     for (node, embedded_html) in combined_dot:
         dot.node(str(node), label=embedded_html, _attributes={'shape': 'record'})
@@ -401,7 +444,8 @@ def embed_histograms_in_dot(decision_tree, dataset, xbis, xbis_shap, xbiscluster
 
 
 def export_decision_tree_with_embedded_histograms(decision_tree, dataset, target_name, feature_names, filename,
-                                                  proto_encoder=None, figsize=(6, 3)):
+                                                  proto_encoder=None, focus_class=None, show_prototype=True,
+                                                  figsize=(6, 3)):
     """
     Export a Decision Tree classifier to a DOT file with embedded histograms at each node.
 
@@ -410,23 +454,24 @@ def export_decision_tree_with_embedded_histograms(decision_tree, dataset, target
     - feature_names: List of feature names
     - filename: Name of the DOT file to save
     """
-    output_dir = 'histograms'
+    output_dir = f'histograms'
     os.makedirs(output_dir, exist_ok=True)
 
-    if True:  # try:
+    try:
         xbis = proto_encoder.xbis_
         xbisclusters = proto_encoder.xbis_cluster_labels_
         xbisindices = proto_encoder.signal_ids_
         xbis_shap = proto_encoder.xbis_shap_
+
         dot = embed_histograms_in_dot(decision_tree, dataset, xbis, xbis_shap, xbisclusters, xbisindices, target_name,
-                                      feature_names, output_dir, proto_encoder=proto_encoder, figsize=figsize)
-        # dot.render(filename, cleanup=True, view=True)
+                                      feature_names, output_dir, proto_encoder=proto_encoder, focus_class=focus_class,
+                                      figsize=figsize)
         dot.render(filename, cleanup=True)
         print(f"Decision Tree exported to {filename} with embedded histograms successfully.")
         return dot
+    except:
+        print(f"Decision Tree exported to {filename} with embedded histograms failed.")
 
-    # except Exception as e:
-    #    print(f"Error exporting Decision Tree to DOT file with embedded histograms: {e}")
     return None
 
 
