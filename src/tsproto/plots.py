@@ -11,42 +11,80 @@ from tsproto.utils import dominant_frequencies_for_rows
 COLOR_CYCLE = ["#4286f4", "#f44174"]
 
 
-def plot_and_save_barplot(target, filename, figsize=(4, 2)):
+import matplotlib.pyplot as plt
+import numpy as np
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+def plot_and_save_barplot(target, filename, figsize=(4, 2), class_names=[0, 1]):
     """
-    Plots a bar plot of the number of instances per class and saves it to a file.
+    Plots a bar plot of the number of instances per class with percentage annotations
+    and saves it to a file.
 
     Parameters:
     - target: list or array-like, the target array containing integer class labels.
     - filename: str, the filename to save the plot (including the .png extension).
     - figsize: tuple, optional, the size of the figure (width, height).
+    - class_names: list, optional, the class names to include in the plot. Defaults to [0, 1].
 
     Returns:
     None
     """
-    # Use Set2 colormap directly by indexing with target values
-    colors = plt.cm.Set2(np.unique(target))
+    # Ensure all classes in class_names are included with default count of zero
+    class_counts = {label: 0 for label in class_names}
+    target_counts = {label: list(target).count(label) for label in set(target)}
+    class_counts.update(target_counts)
 
-    # Count the occurrences of each class
-    class_counts = {label: list(target).count(label) for label in set(target)}
-    # Extract class labels and counts
+    # Extract classes and counts, ensuring the order matches class_names
+    classes = class_names
+    counts = [class_counts[label] for label in classes]
+    total_count = sum(counts)
 
-    if len(target) == 0:
-        class_counts = {0: 0, 1: 0}
-    classes, counts = zip(*class_counts.items())
+    # Generate consistent colors for each class
+    colors = plt.cm.Set2(range(len(classes)))
 
-    # Plotting the bar plot with Set2 colormap
+    # Create the bar plot
     fig, ax = plt.subplots(figsize=figsize)
-    bars = plt.bar(classes, counts, color=colors)
-    plt.title('Number of Instances per Class')
-    plt.xlabel('Class')
-    plt.ylabel('Count')
+    bars = ax.bar(classes, counts, color=colors)
+    ax.set_title('Number of Instances per Class')
+    ax.set_xlabel('Class')
+    ax.set_ylabel('Count')
 
+    # Ensure x-axis only displays the class labels
+    ax.set_xticks(classes)
+    ax.set_xticklabels([str(cls) for cls in classes])
+
+    # Annotate each bar with the percentage of the total
+    for bar, count in zip(bars, counts):
+        if total_count > 0:
+            class_count_ratio = f"{(count / total_count) * 100:.1f}%"
+        else:
+            class_count_ratio = "0.0%"
+
+        # Determine the annotation position
+        y_position = bar.get_height() / 2 if bar.get_height() > 0 else bar.get_height() + 2
+        ax.annotate(class_count_ratio,
+                    (bar.get_x() + bar.get_width() / 2., y_position),
+                    ha='center', va='center', fontsize=8, color='white' if bar.get_height() > 0 else 'black')
+
+    # Create the legend
     legend_labels = [f'Class {label}' for label in classes]
-    plt.legend(bars, legend_labels, title='Legend')
+    ax.legend(bars, legend_labels, title='Legend')
 
-    # Save the plot to the specified filename in PNG format
+    # Save the plot
     fig.savefig(filename, format='png', bbox_inches='tight')
     plt.close(fig)
+
+
+
+
 
 
 def plot_barycenter_with_histogram(X_train, X_train_sigids, X_train_shap, X_train_init, X_train_shap_init, Xordidx,
@@ -99,7 +137,7 @@ def plot_barycenter_with_histogram(X_train, X_train_sigids, X_train_shap, X_trai
         stat_name = 'Frequency'
     elif stat_function == 'exists':
         cluster_values = None
-        stat_name = "Number of occurence"
+        stat_name = "Number of occurrence"
     elif stat_function == 'distance':  # FX6
         cluster_values = None
         stat_name = "Similarity"
@@ -232,7 +270,7 @@ def plot_barycenter_with_histogram(X_train, X_train_sigids, X_train_shap, X_trai
 
         if cluster_centers is not None:
             ax[-1].plot(barycenter.ravel(), "r-", linewidth=2)
-        ax[-1].set_title(f"{stat_name} of pattern {cluster_index} of feature/dimension {human_friendly_name} in TS")
+        ax[-1].set_title(f"{stat_name} of pattern {cluster_index} in feature/dimension {human_friendly_name} in TS")
         ax[-1].legend()
 
         if stat_function not in ['exists', 'distance'] and False:  # FX6
@@ -260,8 +298,8 @@ def plot_barycenter_with_histogram(X_train, X_train_sigids, X_train_shap, X_trai
     else:
         if cluster_centers is not None:
             ax[-1].plot(barycenter.ravel(), "r-", linewidth=2,
-                       label=f"Barycenter (Pattern {cluster_index} of feature {human_friendly_name})")
-            ax[-1].set_title(f"Barycenter of Time Series (Pattern {cluster_index} of feature {human_friendly_name})")
+                       label=f"Barycenter (Pattern {cluster_index} in feature {human_friendly_name})")
+            ax[-1].set_title(f"Barycenter of Time Series (Pattern {cluster_index} in feature {human_friendly_name})")
             ax[-1].legend()
 
         if stat_function not in ['exists', 'distance']:  # FX6
