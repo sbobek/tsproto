@@ -44,5 +44,5 @@ It can be seen that in this case, the TSProto used whole time-slice as a explana
 
 The first plot in each node correspond to the anomalous time-slice, the middle to the contrastive example (i.e. the normal sample) and the third plot correspond to the prototype, i.e. the representative example of the time-awriwa that correspond to the anomalous case.
 
-.. image:: https://raw.githubusercontent.com/sbobek/tsproto/main/pix/metr3failure.png
+.. image:: https://raw.githubusercontent.com/sbobek/tsproto/main/pix/metropt3failure.png
     :alt: Illustrative example
