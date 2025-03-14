@@ -25,7 +25,10 @@ The next example shows the ECG200 dataset form `UCR repository <https://timeseri
 The dataset distinguishes between healthy and unhealthy patients.
 
 In the figure below you can see how the TSProto interpreted the blackbox model decisions.
-In this example, the TSProto was asked to compare fragments of time-series only at matching locations (i.e. do not compare fragment form the end of ECG with fragmwnt form the beginning, as the location of the patter in this time series maters).
+In this example, the TSProto was asked to compare fragments of time-series only at matching locations (i.e. do not compare fragment form the end of ECG with fragment form the beginning, as the location of the patter in this time series maters).
+
+The middle plot contains therefore the contrastive fragment of samples from opposite class than the top plot.
+This contrastive samples show how the particular fragment of the plot should look like in order the class to be changes by the blackbox model.
 
 .. image:: https://raw.githubusercontent.com/sbobek/tsproto/main/pix/ecg200.png
     :alt: Illustrative example
