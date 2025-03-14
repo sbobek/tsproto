@@ -35,7 +35,7 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
     """
 
     def __init__(self, blackbox, min_size, jump, pen, n_clusters, multiplier=1.5, global_breakpointing=False,
-                 method='kshape', descriptors=['existance', 'duration', 'stats'],
+                 method='kshape', descriptors=['existance', 'duration', 'stats','similarity'],
                  n_jobs=None, verbose=0, dims=1, sampling_rate=1, feature_names=None,
                  importance_aggregation_func=np.mean, pelt_model='rbf'):
         """ Initializes PrototypeEncoder class
@@ -490,7 +490,9 @@ class PrototypeEncoder(BaseEstimator, TransformerMixin):
             print(self.descriptors)
 
             if 'existance' in self.descriptors and self.method not in ['sbc']:
-                features = features + list(ohe_train.columns) + list(ohe_dst.columns)
+                features = features + list(ohe_train.columns)
+            if 'similarity' in self.descriptors and self.method not in ['sbc']:
+                features = features + list(ohe_dst.columns)
             if 'duration' in self.descriptors and self.method not in ['sbc']:
                 features = features + list(duration_train.columns) + list(startpoint_train.columns)
             if 'stats' in self.descriptors:

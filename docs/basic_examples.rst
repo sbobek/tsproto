@@ -16,7 +16,7 @@ The basic usage of the TSProto assuming you have your model trained is straightf
 
     pe = PrototypeEncoder(clf, n_clusters=2, min_size=50, method='dtw',
                           descriptors=['existance'],
-                          jump=1, pen=1,multiplier=2,n_jobs=-1,
+                          jump=1, pen=1,multiplier=None,n_jobs=-1,
                           verbose=1)
 
     trainX, shapclass = getshap(model=model, X=trainX, y=trainy,shap_version='deep',

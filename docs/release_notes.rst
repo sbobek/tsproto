@@ -1,9 +1,10 @@
 Release notes
 =============
 
-0.3.1 (2024-12-27)
+0.3.1 (2025-03-14)
 -------------
-* Fixed issue with incorrect contrastive eample plotting when plotted pattern is only in focus class
+* Added tutorial that explains how to interpret the TSProto explanations
+* Fixed issue with incorrect contrastive example plotting when plotted pattern is only in focus class
 * Overriding global_breakpointing parameter, when sbc method is set
 * Bugfix in incorrect number of cluster assignment when sbc method is set
 * Contrastive plots added

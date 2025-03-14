@@ -14,7 +14,7 @@ It provides local explanations in a form of human-readable (and executable) rule
 Install
 =======
 
-LUX can be installed from either `PyPI <https://pypi.org/project/tsproto>`_ or directly from source code `GitHub <https://github.com/sbobek/tsproto>`_
+TSProto can be installed from either `PyPI <https://pypi.org/project/tsproto>`_ or directly from source code `GitHub <https://github.com/sbobek/tsproto>`_
 
 To install form PyPI::
 
@@ -30,6 +30,7 @@ To install from source code::
    :maxdepth: 2
    :caption: Examples
 
+   Interpreting TSProto <interpretation_tutorial>
    Basic Usage examples <basic_examples>
 
 
