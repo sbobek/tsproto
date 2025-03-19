@@ -10,7 +10,7 @@ Basic interpretation of TSProto
 TSProto allows you to interpret the decision of a  blackbox machine learning model by constructing a decision tree, which nodes are formed not from single values as usually, but from chunks of data, representing slices of time-series that are relevant in some way to the blackbox model.
 
 The following example shows the case, where there are two classes which can be differentiated by the component of different frequency.
-The example below shows an explanation of the black model that was trained to distinguish between to classes of time series, which was different only in the first part of the series with different frequency.
+The example below shows an explanation of the black model that was trained to distinguish between two classes of time series, which was different only in the first part of the series with different frequency.
 
 The explanation below should be read as follows: If the stime series contains a component of a frequency that is greater than 0.01 Hz than it belongs to class 1, otherwise, class 0.
 
