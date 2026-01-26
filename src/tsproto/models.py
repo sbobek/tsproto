@@ -16,7 +16,8 @@ from tsproto.utils import dominant_frequencies_for_rows, calculate_trends, cdist
 from sktime.transformations.panel.rocket import MiniRocket
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
-from sklearn_extra.cluster import KMedoids
+from sklearn.metrics.pairwise import euclidean_distances
+import kmedoids
 from sktime.transformations.panel.shapelet_transform import RandomShapeletTransform
 from sktime.datatypes._panel._convert import from_3d_numpy_to_nested
 
@@ -549,21 +550,24 @@ class RocketMedoids:
 
     def __init__(self,n_clusters=2, n_kernels=512, n_components=150,n_jobs=1):
         self.rocket = MiniRocket(num_kernels=n_kernels,n_jobs=n_jobs)
-        self.kmedoids = KMedoids(n_clusters=n_clusters)
+        self.kmedoids = kmedoids.KMedoids(n_clusters=n_clusters,method='fasterpam')
         self.pca = PCA(n_components=n_components)
         self.scaler = StandardScaler()
+        self.pca_medoids_ = None
     def fit(self,X,y=None):
         X = X.reshape(X.shape[0],1,X.shape[1])
         Xr = self.rocket.fit_transform(X, y)
         Xr = Xr.replace([np.inf, -np.inf], np.nan).fillna(0)
         Xr=self.scaler.fit_transform(Xr)
         Xrd = self.pca.fit_transform(Xr)
-        self.kmedoids.fit(Xrd)
+        self.kmedoids.fit(euclidean_distances(Xrd))
         self.cluster_centers_ = X[self.kmedoids.medoid_indices_]#self.rocket.inverse_transform(self.pca.inverse_transform(self.kmedoids.cluster_centers_))
+        self.pca_medoids_ = Xrd[self.kmedoids.medoid_indices_]
         self.labels_ = self.kmedoids.labels_
     def predict(self,X):
         X = X.reshape(X.shape[0],1,X.shape[1])
-        return self.kmedoids.predict(self.pca.transform(self.scaler.transform(self.rocket.transform(X).fillna(0))))
+        dists = euclidean_distances(self.pca.transform(self.scaler.transform(self.rocket.transform(X).fillna(0))), self.pca_medoids_)
+        return np.argmin(dists, axis=1)
 
 
 class InterpretableModel:
